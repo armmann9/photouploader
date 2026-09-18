@@ -97,4 +97,21 @@ This file tracks all security, database, performance, and stability modification
 * **How to Undo (Rollback)**:
   - In Git: `git revert affc3c8`.
 
+---
+
+## Phase 6 — Cloudflare Production Readiness & Security Hardening
+
+### Step 1: Production Security Headers & Edge Image Delivery
+* **Date**: September 2026
+* **Files Touched**:
+  1. [`next.config.mjs`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/next.config.mjs) (Modified)
+* **One-Line Plain-English Summaries**:
+  - Added strict HTTP security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(self)`) and enabled `unoptimized: true` on images for direct Cloudflare CDN edge delivery.
+* **Why**:
+  - Protects visitors against clickjacking, MIME sniffing, and unauthorized camera access.
+  - Eliminates server-side image resizing proxy vulnerabilities (DoS CVE GHSA-9g9p-9gw9-jx7f) so images serve straight from Cloudflare CDN edge.
+* **How to Undo (Rollback)**:
+  - In Git: `git revert <commit-hash>`.
+
+
 
