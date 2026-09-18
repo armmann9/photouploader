@@ -27,6 +27,7 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
   const [isUploading, setIsUploading] = useState(false);
   const [currentTag, setCurrentTag] = useState('Highlights');
   const [overallProgress, setOverallProgress] = useState(0);
+  const [sessionOnlyWarning, setSessionOnlyWarning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelection = (files: FileList | null) => {
@@ -56,6 +57,7 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
     const batchSize = 3; // Process 3 images in parallel for smooth performance
     const newPhotosToSave: PhotoItem[] = [];
     let completedCount = 0;
+    let anySessionOnly = false;
 
     for (let i = 0; i < queue.length; i += batchSize) {
       const currentBatch = queue.slice(i, i + batchSize);
@@ -65,16 +67,30 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
           // Update status to uploading
           updateQueueItemStatus(item.id, 'uploading', 25);
 
-          let photoUrl = item.previewUrl;
-          let thumbnailUrl = item.previewUrl;
+          let photoUrl: string;
+          let thumbnailUrl: string;
 
-          // 1. Cloud Storage Upload (if configured)
+          // 1. Cloud Storage Upload (preferred — persistent CDN URL)
           if (isCloud) {
             const uploadRes = await uploadPhotoToCloud(item.file, item.file.name, eventId);
             if (uploadRes.publicUrl) {
               photoUrl = uploadRes.publicUrl;
               thumbnailUrl = uploadRes.publicUrl;
+            } else {
+              // Cloud upload attempt failed — use blob URL for this session only.
+              // Do NOT convert to base64: a 1-3MB base64 string per photo would
+              // immediately blow the 5MB localStorage quota for bulk uploads.
+              photoUrl = item.previewUrl;
+              thumbnailUrl = item.previewUrl;
+              anySessionOnly = true;
             }
+          } else {
+            // No cloud configured — session-only blob URL for this tab.
+            // Do NOT convert to base64: would blow localStorage quota.
+            // Admin must configure Supabase for cross-session persistence.
+            photoUrl = item.previewUrl;
+            thumbnailUrl = item.previewUrl;
+            anySessionOnly = true;
           }
 
           updateQueueItemStatus(item.id, 'indexing_faces', 60);
@@ -94,6 +110,8 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
           }
 
           updateQueueItemStatus(item.id, 'completed', 100, faceDescriptors?.length);
+          // NOTE: do NOT revokeObjectURL here — when session-only, the blob URL
+          // IS the stored photo URL and must remain valid while the tab is open.
 
           const newPhoto: PhotoItem = {
             id: `photo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -114,11 +132,13 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
       );
     }
 
-    // Save all to database
+    // Save metadata to database (safeLocalStorageSet in db.ts guards against quota crashes)
     await savePhotos(newPhotosToSave);
     setIsUploading(false);
+    if (anySessionOnly) setSessionOnlyWarning(true);
     onUploadComplete(newPhotosToSave.length);
   };
+
 
   const updateQueueItemStatus = (
     id: string,
@@ -145,36 +165,47 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '28px', borderRadius: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+          <h3 className="text-xl font-display font-bold text-amber-200">
             Bulk Photo Uploader (200+ Photos)
           </h3>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          <p className="text-xs text-emerald-300/70 mt-0.5">
             Upload high-resolution event photos. AI will automatically index facial features for guest search.
           </p>
         </div>
 
         {/* Tag selector */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Category Tag:</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-amber-300/80">Category Tag:</span>
           <input
             type="text"
             value={currentTag}
             onChange={(e) => setCurrentTag(e.target.value)}
-            placeholder="e.g. Sangeet, Ceremony, Keynote"
-            style={{
-              padding: '6px 12px',
-              borderRadius: '8px',
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid var(--border-subtle)',
-              color: '#fff',
-              fontSize: '0.8rem',
-            }}
+            placeholder="e.g. Sangeet, Ceremony, Aarti"
+            className="px-3 py-1.5 rounded-xl bg-emerald-900/60 border border-emerald-700/50 text-amber-100 text-xs focus:border-amber-400 outline-none transition-all placeholder:text-emerald-400/40"
           />
         </div>
       </div>
+
+      {/* Cloud Storage Warning Banner (Quota safety) */}
+      {sessionOnlyWarning && (
+        <div className="bg-amber-950/80 border border-amber-500/50 rounded-2xl p-4 flex items-start gap-3 shadow-lg">
+          <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-200/90 leading-relaxed space-y-1">
+            <p className="font-bold text-amber-300">
+              Cloud Storage Not Configured — Session-Only Mode Active
+            </p>
+            <p>
+              Photos are stored in memory for this browser session. To protect against the browser's 5MB local storage quota limit, full image data is not saved to localStorage.
+            </p>
+            <p className="text-amber-400/80">
+              To persist photos across refreshes and devices, configure <code className="bg-emerald-950 px-1 py-0.5 rounded text-amber-200">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-emerald-950 px-1 py-0.5 rounded text-amber-200">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Drop Zone Area */}
       <div
@@ -184,36 +215,15 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
           e.preventDefault();
           handleFileSelection(e.dataTransfer.files);
         }}
-        style={{
-          border: '2px dashed rgba(99, 102, 241, 0.4)',
-          borderRadius: '16px',
-          padding: '40px 20px',
-          textAlign: 'center',
-          background: 'rgba(99, 102, 241, 0.04)',
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          marginBottom: '24px',
-        }}
-        onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--accent-cyan)')}
-        onMouseOut={(e) => (e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.4)')}
+        className="border-2 border-dashed border-amber-400/40 hover:border-amber-400 rounded-3xl p-8 sm:p-12 text-center bg-emerald-950/40 hover:bg-emerald-900/30 transition-all cursor-pointer shadow-inner group"
       >
-        <div style={{
-          width: '60px',
-          height: '60px',
-          borderRadius: '16px',
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(6, 182, 212, 0.2))',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '0 auto 16px',
-          color: '#38bdf8',
-        }}>
-          <UploadCloud size={30} />
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center mx-auto mb-4 text-amber-400 group-hover:scale-110 transition-transform">
+          <UploadCloud className="w-8 h-8" />
         </div>
-        <h4 style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '6px' }}>
-          Drag & Drop all event photos here, or click to select
+        <h4 className="text-base sm:text-lg font-bold text-amber-100 mb-1">
+          Drag & Drop all event photos here, or click to browse
         </h4>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+        <p className="text-xs text-emerald-300/70">
           Supports 200+ images simultaneously • JPG, PNG, WEBP, HEIC
         </p>
 
@@ -223,38 +233,27 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
           multiple
           accept="image/*"
           onChange={(e) => handleFileSelection(e.target.files)}
-          style={{ display: 'none' }}
+          className="hidden"
         />
       </div>
 
       {/* Selected Photos Queue Overview */}
       {queue.length > 0 && (
-        <div>
+        <div className="space-y-4">
           {/* Status summary banner */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            background: 'rgba(255, 255, 255, 0.04)',
-            padding: '12px 18px',
-            borderRadius: '10px',
-            marginBottom: '16px',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ImageIcon size={18} color="#06b6d4" />
-              <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>
+          <div className="flex items-center justify-between bg-emerald-900/60 border border-emerald-700/50 px-4 py-3 rounded-2xl flex-wrap gap-3">
+            <div className="flex items-center gap-2.5">
+              <ImageIcon className="w-5 h-5 text-amber-400" />
+              <span className="text-xs sm:text-sm font-semibold text-amber-200">
                 {queue.length} Photos Selected ({calculateTotalSizeMB()} MB)
               </span>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="flex items-center gap-2.5">
               {!isUploading && (
                 <button
                   onClick={handleClearQueue}
-                  className="btn-secondary"
-                  style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-950 border border-emerald-700 text-emerald-300 text-xs font-semibold transition-all"
                 >
                   Clear Queue
                 </button>
@@ -263,17 +262,16 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
               <button
                 onClick={handleStartUpload}
                 disabled={isUploading}
-                className="btn-primary"
-                style={{ padding: '8px 20px', fontSize: '0.85rem' }}
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 text-emerald-950 font-bold text-xs shadow-md transition-all disabled:opacity-50"
               >
                 {isUploading ? (
                   <>
-                    <RefreshCw size={15} className="animate-spin" />
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     <span>Uploading & Indexing ({overallProgress}%)...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles size={15} />
+                    <Sparkles className="w-3.5 h-3.5" />
                     <span>Start Bulk Upload & AI Indexing</span>
                   </>
                 )}
@@ -283,58 +281,44 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
 
           {/* Overall Progress Bar */}
           {isUploading && (
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-semibold text-emerald-300">
                 <span>Uploading to Cloud & AI Facial Vector Embedding</span>
-                <span style={{ color: '#38bdf8', fontWeight: 700 }}>{overallProgress}%</span>
+                <span className="text-amber-400">{overallProgress}%</span>
               </div>
-              <div style={{ height: '8px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${overallProgress}%`, background: 'var(--accent-gradient)', transition: 'width 0.2s ease' }} />
+              <div className="h-2.5 bg-emerald-950 rounded-full overflow-hidden border border-emerald-800">
+                <div
+                  className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300"
+                  style={{ width: `${overallProgress}%` }}
+                />
               </div>
             </div>
           )}
 
           {/* Thumbnails preview strip */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
-            gap: '10px',
-            maxHeight: '340px',
-            overflowY: 'auto',
-            padding: '4px',
-          }}>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5 max-h-80 overflow-y-auto p-1">
             {queue.map((item) => (
               <div
                 key={item.id}
-                style={{
-                  position: 'relative',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  aspectRatio: '1 / 1',
-                  background: 'rgba(0,0,0,0.5)',
-                  border: item.status === 'completed' ? '1px solid #10b981' : '1px solid var(--border-subtle)',
-                }}
+                className={`relative rounded-xl overflow-hidden aspect-square bg-emerald-950 border ${
+                  item.status === 'completed'
+                    ? 'border-emerald-400'
+                    : 'border-emerald-800'
+                }`}
               >
                 <img
                   src={item.previewUrl}
                   alt={item.file.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  className="w-full h-full object-cover"
                 />
 
                 {/* Status Overlay */}
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'rgba(0, 0, 0, 0.45)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   {item.status === 'completed' && (
-                    <div style={{ textAlign: 'center' }}>
-                      <CheckCircle2 size={20} color="#34d399" />
+                    <div className="text-center">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400 mx-auto" />
                       {item.facesCount !== undefined && (
-                        <div style={{ fontSize: '0.65rem', color: '#fff', marginTop: '2px' }}>
+                        <div className="text-[10px] text-amber-200 mt-0.5">
                           {item.facesCount} faces
                         </div>
                       )}
@@ -342,30 +326,22 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
                   )}
 
                   {item.status === 'uploading' && (
-                    <RefreshCw size={18} color="#38bdf8" className="animate-spin" />
+                    <RefreshCw className="w-5 h-5 text-amber-400 animate-spin" />
                   )}
 
                   {item.status === 'indexing_faces' && (
-                    <div style={{ textAlign: 'center' }}>
-                      <Sparkles size={18} color="#a855f7" className="animate-pulse" />
-                      <div style={{ fontSize: '0.65rem', color: '#c084fc' }}>AI Indexing</div>
+                    <div className="text-center">
+                      <Sparkles className="w-5 h-5 text-purple-400 animate-pulse mx-auto" />
+                      <div className="text-[9px] text-purple-200">AI Indexing</div>
                     </div>
                   )}
 
                   {item.status === 'pending' && !isUploading && (
                     <button
                       onClick={() => removeQueueItem(item.id)}
-                      style={{
-                        position: 'absolute',
-                        top: '4px',
-                        right: '4px',
-                        background: 'rgba(0,0,0,0.6)',
-                        color: '#fff',
-                        borderRadius: '50%',
-                        padding: '2px',
-                      }}
+                      className="absolute top-1 right-1 bg-black/70 hover:bg-black text-white rounded-full p-1 transition-all"
                     >
-                      <X size={14} />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
