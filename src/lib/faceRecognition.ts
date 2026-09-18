@@ -250,14 +250,27 @@ export function calculateEuclideanMatchScore(vecA: number[], vecB: number[]): nu
 }
 
 /**
- * Helper to generate HTMLImageElement from File or Blob
+ * Helper to generate HTMLImageElement from File or Blob.
+ *
+ * The object URL is revoked immediately after the image loads (or fails)
+ * to prevent memory leaks during bulk photo processing sessions.
  */
 export function createImageElementFromBlob(blob: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = (e) => reject(e);
-    img.src = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl); // Free the Blob from browser memory
+      resolve(img);
+    };
+
+    img.onerror = (e) => {
+      URL.revokeObjectURL(objectUrl); // Free even on failure
+      reject(e);
+    };
+
+    img.src = objectUrl;
   });
 }

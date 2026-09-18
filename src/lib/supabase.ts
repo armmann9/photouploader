@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Environment variables (provided when deployed to Vercel or locally via .env.local)
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -14,16 +14,21 @@ export function getSupabaseClient(): SupabaseClient | null {
   let key = SUPABASE_ANON_KEY;
 
   if (typeof window !== 'undefined') {
-    const customUrl = localStorage.getItem('eventlens_supabase_url');
-    const customKey = localStorage.getItem('eventlens_supabase_key');
-    if (customUrl && customKey) {
-      url = customUrl;
-      key = customKey;
+    try {
+      const customUrl = localStorage.getItem('eventlens_supabase_url');
+      const customKey = localStorage.getItem('eventlens_supabase_key');
+      if (customUrl && customKey) {
+        url = customUrl;
+        key = customKey;
+      }
+    } catch {
+      // ignore
     }
   }
 
   if (url && key && url.startsWith('http')) {
     try {
+      const { createClient } = require('@supabase/supabase-js');
       supabaseInstance = createClient(url, key);
       return supabaseInstance;
     } catch (e) {

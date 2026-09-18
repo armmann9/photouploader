@@ -2,147 +2,146 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Calendar, MapPin, Image as ImageIcon, QrCode, ArrowRight, UploadCloud, Sparkles } from 'lucide-react';
+import { Calendar, MapPin, Image as ImageIcon, QrCode, ArrowRight, UploadCloud, Sparkles, Pencil, Trash2 } from 'lucide-react';
 import { EventItem } from '@/lib/types';
+import { formatFestiveDate } from '@/utils/dateUtils';
 import QRCodeModal from './QRCodeModal';
 
 interface EventCardProps {
   event: EventItem;
   isAdminView?: boolean;
+  onEdit?: (event: EventItem) => void;
+  onDelete?: (id: string) => void;
 }
 
-export default function EventCard({ event, isAdminView = false }: EventCardProps) {
+export default function EventCard({ event, isAdminView = false, onEdit, onDelete }: EventCardProps) {
   const [showQR, setShowQR] = useState(false);
+
+  const isUpcoming = event.status === 'upcoming' || (!event.status && new Date(event.date) >= new Date());
 
   return (
     <>
-      <div className="glass-panel glass-panel-hover" style={{
-        borderRadius: '16px',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-      }}>
+      <div className="rounded-3xl bg-emerald-950/70 border border-emerald-800/60 hover:border-amber-400/60 overflow-hidden shadow-[0_12px_32px_rgba(0,0,0,0.4)] flex flex-col justify-between transition-all duration-300 group">
         {/* Cover Image */}
-        <div style={{ position: 'relative', width: '100%', height: '220px', overflow: 'hidden' }}>
+        <div className="relative w-full h-48 sm:h-52 overflow-hidden bg-[#021812]">
           <img
             src={event.coverImage || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80'}
             alt={event.title}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              transition: 'transform 0.5s ease',
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
-            onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
 
-          {/* Dark Overlay Gradient */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(to top, rgba(7, 9, 14, 0.95) 0%, rgba(7, 9, 14, 0.2) 60%, rgba(0,0,0,0) 100%)',
-          }} />
+          {/* Gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#021812] via-black/20 to-black/40 pointer-events-none" />
 
-          {/* Category Badge */}
-          <div style={{ position: 'absolute', top: '14px', left: '14px' }}>
-            <span className="badge badge-event">
-              {event.category || 'Event'}
+          {/* Top Left: Category Badge */}
+          <div className="absolute top-3 left-3">
+            <span className="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-bold shadow-sm backdrop-blur-md">
+              {event.category || 'Festival'}
             </span>
           </div>
 
-          {/* QR Code quick trigger */}
+          {/* Top Right: QR Code button */}
           <button
             onClick={() => setShowQR(true)}
-            style={{
-              position: 'absolute',
-              top: '14px',
-              right: '14px',
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'rgba(0, 0, 0, 0.6)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              transition: 'all 0.2s',
-            }}
+            className="absolute top-3 right-3 w-8 h-8 rounded-xl bg-black/60 hover:bg-amber-500 hover:text-emerald-950 border border-white/20 text-white flex items-center justify-center transition-all shadow-md backdrop-blur-md"
             title="View Event QR Code"
           >
-            <QrCode size={18} />
+            <QrCode className="w-4 h-4" />
           </button>
 
-          {/* Photo Count badge */}
-          <div style={{ position: 'absolute', bottom: '12px', left: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span className="badge badge-count" style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', color: '#fff' }}>
-              <ImageIcon size={13} color="#06b6d4" />
+          {/* Bottom Left: Photo count + Status */}
+          <div className="absolute bottom-3 left-3 flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-black/70 border border-emerald-700/50 text-emerald-300 text-[11px] font-bold flex items-center gap-1.5 backdrop-blur-md">
+              <ImageIcon className="w-3 h-3 text-amber-400" />
               <span>{event.photoCount || 0} Photos</span>
             </span>
 
-            <span className="badge badge-ai" style={{ fontSize: '0.7rem' }}>
-              <Sparkles size={11} /> AI Ready
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-sm backdrop-blur-md ${
+                isUpcoming
+                  ? 'bg-emerald-500/80 text-emerald-950'
+                  : 'bg-yellow-600/80 text-white'
+              }`}
+            >
+              {isUpcoming ? '🟢 Upcoming' : '⚪ Completed'}
             </span>
           </div>
         </div>
 
-        {/* Content Box */}
-        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+        {/* Card Body */}
+        <div className="p-5 flex flex-col flex-1 justify-between gap-4">
           <div>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px', lineHeight: '1.3' }}>
+            <h3 className="text-lg font-bold text-amber-100 group-hover:text-amber-300 transition-colors line-clamp-1">
               {event.title}
             </h3>
+
             {event.description && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              <p className="text-xs text-emerald-300/70 line-clamp-2 mt-1.5 leading-relaxed">
                 {event.description}
               </p>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8rem', color: 'var(--text-subtle)', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar size={14} color="#a855f7" />
-                <span>{new Date(event.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+            <div className="flex flex-col gap-1.5 text-xs text-emerald-400/80 mt-3 pt-3 border-t border-emerald-800/40">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>{formatFestiveDate(event.date)}</span>
               </div>
               {event.location && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <MapPin size={14} color="#06b6d4" />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.location}</span>
+                <div className="flex items-center gap-2 truncate">
+                  <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="truncate">{event.location}</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Action Footer */}
-          <div style={{ display: 'flex', gap: '10px', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)' }}>
+          <div className="flex items-center gap-2 pt-3 border-t border-emerald-800/40">
             <Link
               href={`/event/${event.slug || event.id}`}
-              className="btn-primary"
-              style={{ flex: 1, padding: '10px 16px', fontSize: '0.85rem' }}
+              className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-emerald-950 font-bold text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5"
             >
               <span>View Gallery</span>
-              <ArrowRight size={15} />
+              <ArrowRight className="w-3.5 h-3.5" />
             </Link>
 
             {isAdminView ? (
-              <Link
-                href={`/admin/upload/${event.id}`}
-                className="btn-secondary"
-                style={{ padding: '10px 14px', fontSize: '0.85rem' }}
-                title="Bulk Upload 200+ Photos"
-              >
-                <UploadCloud size={16} />
-              </Link>
+              <>
+                {onEdit && (
+                  <button
+                    onClick={() => onEdit(event)}
+                    className="p-2.5 rounded-xl bg-amber-900/40 hover:bg-amber-800/60 border border-amber-700/50 text-amber-300 transition-all"
+                    title="Edit Event"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                <Link
+                  href={`/admin/upload/${event.id}`}
+                  className="p-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700/60 text-emerald-300 transition-all"
+                  title="Upload Photos"
+                >
+                  <UploadCloud className="w-3.5 h-3.5" />
+                </Link>
+
+                {onDelete && (
+                  <button
+                    onClick={() => onDelete(event.id)}
+                    className="p-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 transition-all"
+                    title="Delete Event"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </>
             ) : (
               <button
                 onClick={() => setShowQR(true)}
-                className="btn-secondary"
-                style={{ padding: '10px 14px' }}
-                title="QR Code"
+                className="p-2.5 rounded-xl bg-emerald-900/40 hover:bg-emerald-900/70 border border-emerald-700/50 text-emerald-300 transition-all"
+                title="View QR Code"
               >
-                <QrCode size={16} />
+                <QrCode className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

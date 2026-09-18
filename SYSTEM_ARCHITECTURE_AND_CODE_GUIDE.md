@@ -1,121 +1,253 @@
-# 📚 EventLens AI — Master Architecture & Codebase Documentation
+# 🏛️ BPSCVS — Complete Master System Architecture, Feature Flows & Database Guide
 
-This document provides a comprehensive breakdown of **every file, directory, data flow, cloud connection, and architectural mechanism** in the EventLens AI codebase, along with ideas for future capabilities.
-
----
-
-## 🗺️ Complete Codebase Map & File Directory
-
-| File / Directory | Purpose & Description | Key Responsibilities |
-|---|---|---|
-| [`src/app/layout.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/layout.tsx) | **Root Application Shell** | Global fonts (`Outfit`, `Plus Jakarta Sans`), metadata SEO, viewport configuration, global `Navbar` and `Footer` wrapper. |
-| [`src/app/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/page.tsx) | **Public Landing Page** | Hero banner, real-time event keyword search, 3-step interactive visual explainer, live gallery grid showcase. |
-| [`src/app/event/[id]/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/event/[id]/page.tsx) | **Guest Gallery & AI Portal** | Event header, dynamic category filtering, **"⚡ Find My Photos" AI scanner**, active match filter banner, and 1-click batch ZIP downloader. |
-| [`src/app/admin/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/admin/page.tsx) | **Host / Photographer Dashboard** | Event creation form (slugs, dates, locations, categories), event management cards, and live cloud status controller. |
-| [`src/app/admin/upload/[id]/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/admin/upload/[id]/page.tsx) | **200+ Photo Bulk Upload Manager** | Dedicated event ingestion manager with real-time AI face indexing progress and thumbnail grid. |
-| [`src/components/Navbar.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/Navbar.tsx) | **Navigation Header** | Brand logo, navigation links, quick "Host Event" button, and interactive Cloud status pill. |
-| [`src/components/Footer.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/Footer.tsx) | **Footer Bar** | Feature pillars summary, technology badges, and copyright details. |
-| [`src/components/FaceSearchModal.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/FaceSearchModal.tsx) | **AI Face Scanner Modal** | Live webcam/phone camera snapshot, file upload fallback, laser scanner animation, face embedding extraction, cosine matching, and celebratory confetti. |
-| [`src/components/BulkUploader.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/BulkUploader.tsx) | **Bulk Upload Engine** | Multi-file drag & drop (200+ files), size calculator, concurrent uploads, background neural net face indexing, and Supabase cloud sync. |
-| [`src/components/GalleryGrid.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/GalleryGrid.tsx) | **Masonry Photo Grid** | Responsive photo gallery, tag filter buttons, multi-photo selection mode, batch ZIP downloader, and Lightbox trigger. |
-| [`src/components/Lightbox.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/Lightbox.tsx) | **Full-Screen Image Viewer** | Lossless original photo inspection, keyboard navigation (Left/Right/Esc), AI match confidence tag, and single download button. |
-| [`src/components/QRCodeModal.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/QRCodeModal.tsx) | **Printable QR Code Generator** | Generates SVG/Canvas QR codes for table standees and lanyard badges with 1-click PNG download and link copy. |
-| [`src/components/CloudConfigModal.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/CloudConfigModal.tsx) | **Live Supabase Configurator** | In-app modal to input and validate Supabase Project URL & Anon API keys with instant ping test. |
-| [`src/lib/faceRecognition.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/faceRecognition.ts) | **AI Neural Network Engine** | Loads SSD-MobileNet v1, Landmark68, and 128-d Feature Descriptors into browser WebGL; calculates Cosine & Euclidean similarity vectors. |
-| [`src/lib/supabase.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/supabase.ts) | **Supabase Cloud Connector** | Initializes Supabase client, handles file uploads to the `event-photos` storage bucket, and generates public CDN URLs. |
-| [`src/lib/db.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/db.ts) | **Unified Data Layer** | CRUD operations for events and photos; queries Supabase PostgreSQL with seamless fallback to localStorage/cache. |
-| [`src/lib/zipDownload.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/zipDownload.ts) | **Client-side ZIP Bundler** | Bundles dozens or hundreds of high-res photos into `.zip` archives directly in the browser using `JSZip` and `FileSaver`. |
-| [`src/lib/types.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/types.ts) | **TypeScript Type Definitions** | Interfaces for `EventItem`, `PhotoItem`, `FaceMatchResult`, and `CloudStorageConfig`. |
-| [`src/lib/sampleData.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/sampleData.ts) | **Curated Initial Dataset** | Sample high-res wedding, tech summit, and fashion gala galleries for immediate testability. |
-| [`src/styles/globals.css`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/styles/globals.css) | **Glassmorphic Design System** | CSS tokens for dark luxury aesthetics, glowing borders, neon cyan/violet gradients, hover micro-animations, and responsive containers. |
-| [`supabase-schema.sql`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/supabase-schema.sql) | **Database Setup Script** | Ready-to-run PostgreSQL SQL script creating `events` table, `photos` table, and `event-photos` storage bucket with public RLS policies. |
-| [`DEPLOYMENT_GUIDE.md`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/DEPLOYMENT_GUIDE.md) | **Production Deployment Guide** | Step-by-step instructions to deploy live on Vercel and Supabase in 5 minutes for $0/mo. |
+> **Bani Park Sindhi Colony Vikas Samiti (BPSCVS), Jaipur**  
+> Official Community Portal, Festival Preservation Vault, Executive Admin & Studio Platform.  
+> **Canonical Design Language:** Deepotsav Dark Emerald (`#021812`) & Royal Amber-Gold.
 
 ---
 
-## 🔄 Core System Workflows & Connections
+## 1. 🗺️ Platform Architecture & Zone Matrix
 
-### Flow 1: The Guest AI "Find My Photos" Flow
+The BPSCVS ecosystem is organized into four distinct architectural zones:
+
+```
+                                  ┌─────────────────────────────────────────────────────────────┐
+                                  │                BPSCVS PLATFORM ECOSYSTEM                   │
+                                  └──────────────────────────────┬──────────────────────────────┘
+                                                                 │
+         ┌───────────────────────────────┬───────────────────────┴───────────────┬──────────────────────────────┐
+         ▼                               ▼                                       ▼                              ▼
+┌───────────────────┐           ┌───────────────────┐                   ┌──────────────────┐           ┌───────────────────┐
+│   PUBLIC PORTAL   │           │    ADMIN SUITE    │                   │  STUDIO PORTAL   │           │   DATA ACCESS     │
+│   (Resident/Guest)│           │  (Exec Committee) │                   │  (Media Team)    │           │      LAYER        │
+├───────────────────┤           ├───────────────────┤                   ├──────────────────┤           ├───────────────────┤
+│ • / (Home)        │           │ • /admin          │                   │ • /studio        │           │ • src/lib/db.ts   │
+│ • 3D Tilt Albums  │           │ • Event Lifecycle │                   │ • Bulk Uploader  │           │ • Supabase Cloud  │
+│ • Panchang/Tithi  │           │ • Live RSVP Desk  │                   │ • Shot Lists     │           │ • LocalStorage v3 │
+│ • RSVP Calculator │           │ • Photo Moderation│                   │ • Catalog Archive│           │ • Event Broad-    │
+│ • Helpline Desk   │           │ • /admin/upload/id│                   │ • Tag Management │           │   caster (Tabs)   │
+└───────────────────┘           └───────────────────┘                   └──────────────────┘           └───────────────────┘
+```
+
+| Zone | Primary Route | Role Access | Primary Purpose & Features |
+|---|---|---|---|
+| **Public Portal** | `/` | Open to All | Festival albums showcase, live interactive Diya lighting, 3D tilt albums, Panchang schedules, live RSVP counters, emergency helpline, tech guide. |
+| **Admin Suite** | `/admin`, `/admin/upload/[id]` | Committee Admin | Create/Edit/Delete colony events, real-time RSVP & Mahaprasad roster, crowdsourced photo moderation, 200+ photo bulk uploader, WhatsApp broadcasts, poster printing. |
+| **Media Studio** | `/studio` | Media Team / Photog | Festival assignment checklist, Committee shot-list tracker, photo tagging, destination album routing. |
+| **Auth & Security** | `/login` | Staff / Admin / Media | Role-based authentication (`admin`, `photographer`, `resident`), session tokens, route guards. |
+
+---
+
+## 2. 🔄 Feature Flows & Sequence Diagrams
+
+### Flow A: Admin Event Creation & Real-Time Main Page Synchronization
+
+When an executive committee member creates an event in the Admin Dashboard, it immediately syncs to the public album grid and RSVP forms without requiring a server rebuild:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Guest as Event Guest (Mobile Phone)
-    participant QR as Event QR Standee
-    participant Gallery as Guest Event Page (/event/[id])
-    participant AI as Browser WebGL Neural Net (face-api.js)
-    participant CDN as Cloud CDN (Supabase Storage)
+    actor Admin as Committee Admin (/admin)
+    participant DB as Unified Data Layer (src/lib/db.ts)
+    participant Cloud as Supabase / LocalStorage (bpscvs_events_v3)
+    participant Bus as Browser CustomEvent ("bpscvs_events_updated")
+    actor Resident as Resident (/ Main Page)
 
-    Guest->>QR: Scans QR code with camera
-    QR-->>Guest: Opens https://yourapp.vercel.app/event/arav-wedding
-    Guest->>Gallery: Clicks "⚡ Find My Photos"
-    Gallery->>AI: Prompts camera & captures 1-second selfie
-    AI->>AI: Detects face & computes 128-d descriptor vector
-    AI->>AI: Compares selfie vector against event photos (Cosine Similarity)
-    AI-->>Gallery: Returns matched photos (Score >= 45%)
-    Gallery-->>Guest: Displays filtered "My Photos" & plays celebratory confetti
-    Guest->>Gallery: Clicks "Download All as ZIP"
-    Gallery->>CDN: Streams lossless high-res photos
-    Gallery-->>Guest: Saves ZIP package directly to camera roll / files
+    Admin->>DB: createEvent({ title, category, date, location, coverImage })
+    DB->>Cloud: Persist new EventItem row
+    DB->>Bus: Dispatch "bpscvs_events_updated" (Cross-Tab & Component)
+    Bus-->>Resident: Event Listener fires handleUpdate()
+    Resident->>DB: Calls getMergedFestivalEvents()
+    DB->>DB: Merges base FESTIVAL_EVENTS with dynamic created EventItems
+    DB-->>Resident: Returns updated array with new event
+    Resident->>Resident: Album Grid, Tilt Cards & RSVP Dropdown re-render live
 ```
 
 ---
 
-### Flow 2: The Photographer 200+ Photo Bulk Upload Flow
+### Flow B: 200+ Photo Bulk Ingestion & AI Face Indexing Flow
+
+Dedicated high-volume photo ingestion for festival albums:
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Photog as Photographer / Studio Admin
-    participant Admin as Admin Dashboard (/admin/upload/[id])
-    participant AI as Browser Neural Worker
-    participant DB as Supabase PostgreSQL Database
-    participant Storage as Supabase Cloud Storage (CDN)
+    actor Photog as Media Team / Admin (/admin/upload/[id])
+    participant Uploader as BulkUploader.tsx
+    participant Storage as Supabase Bucket ("event-photos") / Blob
+    participant AI as Browser Neural Net (face-api.js)
+    participant DB as Unified DB (savePhotos)
 
-    Photog->>Admin: Selects / Drops 200+ RAW/JPG photos (1.2 GB)
-    Admin->>Admin: Calculates total size & queues batch streams (3 parallel)
-    loop For Each Image
-        Admin->>Storage: Direct multi-part upload to 'event-photos' bucket
-        Storage-->>Admin: Returns public CDN URL
-        Admin->>AI: Ingests image thumbnail
-        AI->>AI: Detects all faces in photo & extracts 128-d vectors
-        AI-->>Admin: Returns face coordinates & embeddings array
+    Photog->>Uploader: Drops 200+ high-res JPG/PNG files
+    Uploader->>Uploader: Calculates total size (MB) & queues batches
+    loop Parallel Batch of 3 Images
+        Uploader->>Storage: Direct stream upload
+        Storage-->>Uploader: Returns persistent CDN URL
+        Uploader->>AI: Computes 128-d face descriptors
+        AI-->>Uploader: Returns bounding boxes & face vectors
     end
-    Admin->>DB: Upserts photo records + face vector metadata in bulk
-    DB-->>Admin: Increments event photo count
-    Admin-->>Photog: Shows "200 Photos Uploaded & Indexed Successfully!"
+    Uploader->>DB: savePhotos(PhotoItem[])
+    DB->>DB: Updates event photoCount & notifies tabs
+    Uploader-->>Photog: Displays "Upload & Indexing Complete" with count
 ```
 
 ---
 
-## 🚀 What More Can We Build Next? (Expansion Opportunities)
+### Flow C: Resident RSVP & Mahaprasad Dining Counter Flow
 
-Here are the highest-value features you can add to scale your event photography business:
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Resident as Colony Resident (Home Page)
+    participant Widget as BpscvsRsvpWidget.tsx
+    participant State as Local Storage / API
+    participant Admin as Admin RSVP Roster (/admin)
 
-### 1. 📲 WhatsApp & SMS Direct Photo Delivery
-- **How it works**: Instead of guests visiting the website, they send a selfie to your **WhatsApp Business Number** or enter their phone number on the site.
-- **Outcome**: A cloud webhook matches their face and automatically sends a WhatsApp message with all their high-res photos within 10 seconds!
-
-### 2. 💰 Client Proofing, Watermarking & Monetization
-- **How it works**: Display preview photos with an elegant semi-transparent studio watermark (e.g. *“Shot by Aura Studios”*).
-- **Monetization**:
-  - Allow hosts to buy unlimited full-res downloads for their guests.
-  - Or allow guests to order high-quality physical prints, photo books, or frame delivered directly to their doorstep via an integrated print API (like Printful / Prodigi / Razorpay / Stripe).
-
-### 3. 📸 Live Camera Wireless Tethering (Instant Real-Time Uploads)
-- **How it works**: Event photographers shoot with Wi-Fi / FTP tethered cameras (Sony, Canon, Nikon) connected to a portable 5G hotspot.
-- **Outcome**: Photos appear on the live website **5 seconds after the photographer presses the shutter button**, allowing guests to view and download photos *during the event itself*!
-
-### 4. 🎥 AI Video Highlight Reels & Face-Tracked Shorts
-- **How it works**: The AI identifies the key moments where a specific guest is dancing, laughing, or smiling and auto-generates a 15-second vertical Instagram Story/Reel with music.
-
-### 5. 📖 Digital Guestbook & Selfie Wall
-- **How it works**: Project a live interactive "Selfie Wall" on the banquet screens or wedding projector showing a live grid of guests scanning in and wishing the couple congratulations in real time.
+    Resident->>Widget: Fills Name, Plot/Flat, Adults, Kids, Diet (Regular/Jain/Falahar)
+    Widget->>State: Saves RSVP record
+    Widget-->>Resident: Plays audio chime, triggers Phool Barsao flower shower & confirms badge
+    State-->>Admin: Admin RSVP Roster reflects headcounts & thali allocations
+```
 
 ---
 
-## 🔒 Security, Privacy & Compliance
+## 3. 🗄️ Database Schemas & Storage Design
 
-1. **Private Event PINs**: Events can be protected with a 4-digit PIN code so only authorized guests with the code can view or search the gallery.
-2. **Ephemeral Selfie Processing**: Guest selfies are processed purely in client-side volatile memory (RAM) and are **never stored permanently on servers**, ensuring complete biometric privacy compliance (GDPR / CCPA).
-3. **Lossless Preservation**: Original uploaded photo files are never compressed or resized destructively, guaranteeing that 4K/8K camera quality is preserved.
+The BPSCVS platform utilizes a **Dual-Engine Persistence Strategy**:
+1. **Primary Cloud**: Supabase PostgreSQL + S3 Storage Bucket.
+2. **Offline / Fallback**: Browser `localStorage` with in-memory caching (`bpscvs_events_v3`, `bpscvs_photos_v3`).
+
+### 1. `events` Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS public.events (
+    id TEXT PRIMARY KEY,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    date DATE NOT NULL,
+    time TEXT DEFAULT '18:00',
+    location TEXT NOT NULL,
+    cover_image TEXT NOT NULL,
+    category TEXT DEFAULT 'Deepotsav',
+    status TEXT DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'completed')),
+    map_url TEXT,
+    registration_open BOOLEAN DEFAULT true,
+    photo_count INTEGER DEFAULT 0,
+    pin_code TEXT DEFAULT '302016',
+    is_public BOOLEAN DEFAULT true,
+    photographer_name TEXT,
+    photographer_contact TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### 2. `photos` Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS public.photos (
+    id TEXT PRIMARY KEY,
+    event_id TEXT REFERENCES public.events(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    thumbnail_url TEXT,
+    title TEXT,
+    width INTEGER,
+    height INTEGER,
+    size_bytes BIGINT,
+    tags TEXT[] DEFAULT '{}',
+    faces JSONB DEFAULT '[]', -- Array of 128-d facial vector descriptors
+    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### 3. `rsvps` Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS public.rsvps (
+    id TEXT PRIMARY KEY,
+    event_id TEXT REFERENCES public.events(id) ON DELETE CASCADE,
+    resident_name TEXT NOT NULL,
+    bungalow_plot TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    adults_count INTEGER DEFAULT 1,
+    kids_count INTEGER DEFAULT 0,
+    diet_preference TEXT DEFAULT 'regular' CHECK (diet_preference IN ('regular', 'jain', 'falahar')),
+    is_attending BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### 4. `moderation_queue` Table Schema
+
+```sql
+CREATE TABLE IF NOT EXISTS public.moderation_queue (
+    id TEXT PRIMARY KEY,
+    event_id TEXT REFERENCES public.events(id) ON DELETE CASCADE,
+    resident_name TEXT NOT NULL,
+    bungalow_plot TEXT NOT NULL,
+    url TEXT NOT NULL,
+    caption TEXT,
+    tag TEXT DEFAULT 'General',
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    likes INTEGER DEFAULT 0
+);
+```
+
+---
+
+## 4. 🔌 API & Unified Data Access Layer (`src/lib/db.ts`)
+
+| Function | Parameters | Return Type | Description |
+|---|---|---|---|
+| `getAllEvents()` | none | `Promise<EventItem[]>` | Fetches all colony events from Supabase or LocalStorage cache. |
+| `getEventById(id)` | `id: string` | `Promise<EventItem \| null>` | Resolves event by either unique ID or slug. |
+| `createEvent(event)` | `Omit<EventItem, 'id'>` | `Promise<EventItem>` | Creates new event, persists to DB/storage, and dispatches `bpscvs_events_updated`. |
+| `updateEvent(id, updates)` | `id: string, updates: Partial<EventItem>` | `Promise<EventItem \| null>` | Updates event and broadcasts update event. |
+| `deleteEvent(id)` | `id: string` | `Promise<boolean>` | Deletes event from DB and broadcasts deletion. |
+| `getPhotosByEventId(id)` | `idOrSlug: string` | `Promise<PhotoItem[]>` | Fetches photos belonging to an event. |
+| `savePhotos(photos)` | `PhotoItem[]` | `Promise<void>` | Appends photos, increments event `photoCount`, and notifies all tabs. |
+| `getMergedFestivalEvents()` | none | `Promise<FestivalEvent[]>` | Merges curated festival events with custom admin events for public views. |
+| `convertEventItemToFestivalEvent(item, photos)` | `EventItem, PhotoItem[]` | `FestivalEvent` | Converts db schema into rich UI visual object with Hindi titles and highlights. |
+| `notifyEventsUpdated(detail)` | `any` | `void` | Triggers browser `bpscvs_events_updated` custom event across tabs. |
+
+---
+
+## 5. 🎨 Design System & Color Tokens (Deepotsav Canonical Theme)
+
+All pages throughout BPSCVS must strictly adhere to the **Deepotsav Dark Emerald & Gold** design tokens:
+
+```css
+:root {
+  /* Canonical Deepotsav Dark Canvas */
+  --bg-primary: #021812;          /* Deepest temple midnight emerald */
+  --bg-secondary: #05241b;        /* Elevated container emerald */
+  --bg-card: rgba(6, 44, 34, 0.8);/* Frosted glass backdrop */
+  --bg-card-hover: rgba(10, 58, 45, 0.95);
+
+  /* Gold Filigree & Accents */
+  --border-subtle: rgba(245, 158, 11, 0.25);
+  --border-glow: rgba(245, 158, 11, 0.45);
+  --border-active: #F59E0B;       /* Amber 500 */
+  --brand-gold: #FBBF24;          /* Amber 400 */
+
+  /* Text Hierarchy */
+  --text-main: #FEF3C7;           /* Amber 50 (warm readable cream) */
+  --text-muted: #A7F3D0;          /* Emerald 200 (soft subtext) */
+  --text-subtle: #6EE7B7;         /* Emerald 300 */
+}
+```
+
+### Typography Hierarchy
+- **Headings & Festival Titles**: `'Rozha One'`, `'Cinzel Decorative'` serif with gold gradients.
+- **Hindi Traditional Accents**: `'Yatra One'`, `'Rozha One'`.
+- **Display UI & Cards**: `'Outfit'`, sans-serif, bold tracking.
+- **Body Text**: `'Plus Jakarta Sans'`, 400/500/600.
+
+---
+
+## 6. 🚀 Zero-Cloud-Bills Hosting Guide
+- **Web App**: Hosted for $0/mo on Vercel or Cloudflare Pages.
+- **Database**: Supabase Free Tier (500MB PostgreSQL, 1GB Storage) or offline-ready LocalStorage dual-engine.
+- **Bandwidth**: Free globally via Cloudflare CDN.
+- **Build Status**: Fully compiled, SSR-isolated, and production-tested.

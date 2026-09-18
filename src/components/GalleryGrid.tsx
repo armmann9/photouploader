@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Download, Sparkles, Check, CheckSquare, Square, FolderDown, SearchX, ImageOff } from 'lucide-react';
+import { Download, Sparkles, Check, CheckSquare, Square, FolderDown, SearchX, ImageOff, Eye } from 'lucide-react';
 import { PhotoItem, FaceMatchResult } from '@/lib/types';
 import { downloadSinglePhoto, downloadPhotosAsZip } from '@/lib/zipDownload';
 import Lightbox from './Lightbox';
@@ -57,7 +57,7 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
     if (selectedList.length === 0) return;
 
     setIsZipping(true);
-    setZipProgress({ percent: 10, text: 'Starting download package...' });
+    setZipProgress({ percent: 10, text: 'Packaging selected photos into ZIP...' });
 
     await downloadPhotosAsZip(
       selectedList,
@@ -71,12 +71,12 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
     }, 1000);
   };
 
-  // Download all current photos (e.g. all matched photos)
+  // Download all current photos
   const handleDownloadAllZip = async () => {
     if (displayedPhotos.length === 0) return;
 
     setIsZipping(true);
-    setZipProgress({ percent: 10, text: 'Packaging all photos...' });
+    setZipProgress({ percent: 10, text: 'Packaging all event photos into ZIP...' });
 
     await downloadPhotosAsZip(
       displayedPhotos,
@@ -97,31 +97,16 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
   return (
     <div>
       {/* Top Filter and Actions Bar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '16px',
-        marginBottom: '24px',
-        padding: '16px 20px',
-        background: 'var(--bg-card)',
-        borderRadius: '16px',
-        border: '1px solid var(--border-subtle)',
-      }}>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6 p-4 rounded-2xl bg-emerald-950/70 border border-emerald-800/60 shadow-lg backdrop-blur-md">
         {/* Category / Tags Filter */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setActiveTag('All')}
-            style={{
-              padding: '6px 14px',
-              borderRadius: '20px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              background: activeTag === 'All' ? 'var(--accent-gradient)' : 'rgba(255, 255, 255, 0.06)',
-              color: '#fff',
-              transition: 'all 0.2s',
-            }}
+            className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              activeTag === 'All'
+                ? 'bg-amber-500 text-emerald-950 shadow-md'
+                : 'bg-emerald-900/40 text-emerald-300 hover:bg-emerald-900/80 border border-emerald-700/40'
+            }`}
           >
             All Photos ({photos.length})
           </button>
@@ -129,15 +114,11 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
             <button
               key={tag}
               onClick={() => setActiveTag(tag)}
-              style={{
-                padding: '6px 14px',
-                borderRadius: '20px',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                background: activeTag === tag ? 'var(--accent-gradient)' : 'rgba(255, 255, 255, 0.06)',
-                color: '#fff',
-                transition: 'all 0.2s',
-              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                activeTag === tag
+                  ? 'bg-amber-500 text-emerald-950 shadow-md'
+                  : 'bg-emerald-900/40 text-emerald-300/80 hover:bg-emerald-900/80 border border-emerald-700/40'
+              }`}
             >
               #{tag}
             </button>
@@ -145,23 +126,16 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
         </div>
 
         {/* Action Buttons: Batch Select / Zip Download */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setIsSelectionMode(!isSelectionMode)}
-            style={{
-              padding: '8px 14px',
-              borderRadius: '10px',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              background: isSelectionMode ? 'rgba(99, 102, 241, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-              border: isSelectionMode ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-              color: '#fff',
-            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border ${
+              isSelectionMode
+                ? 'bg-amber-500/20 border-amber-400/50 text-amber-300'
+                : 'bg-emerald-900/40 border-emerald-700/50 text-emerald-300 hover:bg-emerald-900/70'
+            }`}
           >
-            {isSelectionMode ? <CheckSquare size={14} color="#a855f7" /> : <Square size={14} />}
+            {isSelectionMode ? <CheckSquare className="w-3.5 h-3.5 text-amber-400" /> : <Square className="w-3.5 h-3.5" />}
             <span>{isSelectionMode ? 'Exit Select Mode' : 'Select Multiple'}</span>
           </button>
 
@@ -169,10 +143,9 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
             <button
               onClick={handleDownloadSelectedZip}
               disabled={isZipping}
-              className="btn-primary"
-              style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-emerald-950 font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50"
             >
-              <FolderDown size={14} />
+              <FolderDown className="w-3.5 h-3.5" />
               <span>Download Selected ({selectedPhotoIds.size})</span>
             </button>
           )}
@@ -180,10 +153,9 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
           <button
             onClick={handleDownloadAllZip}
             disabled={isZipping || displayedPhotos.length === 0}
-            className="btn-secondary"
-            style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700 text-emerald-200 text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
-            <Download size={14} />
+            <Download className="w-3.5 h-3.5 text-amber-400" />
             <span>Download All as ZIP</span>
           </button>
         </div>
@@ -191,66 +163,40 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
 
       {/* ZIP Progress Banner */}
       {isZipping && zipProgress && (
-        <div style={{
-          background: 'rgba(6, 182, 212, 0.12)',
-          border: '1px solid rgba(6, 182, 212, 0.35)',
-          borderRadius: '12px',
-          padding: '14px 20px',
-          marginBottom: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '8px',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-            <span style={{ color: '#38bdf8', fontWeight: 600 }}>{zipProgress.text}</span>
-            <span style={{ color: '#fff', fontWeight: 700 }}>{zipProgress.percent}%</span>
+        <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-400/40 mb-6 flex flex-col gap-2">
+          <div className="flex justify-between text-xs font-semibold text-amber-200">
+            <span>{zipProgress.text}</span>
+            <span>{zipProgress.percent}%</span>
           </div>
-          <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ width: `${zipProgress.percent}%`, height: '100%', background: 'linear-gradient(90deg, #06b6d4, #8b5cf6)', transition: 'width 0.2s' }} />
+          <div className="w-full h-2 bg-emerald-950 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 transition-all duration-300"
+              style={{ width: `${zipProgress.percent}%` }}
+            />
           </div>
         </div>
       )}
 
       {/* Empty State */}
       {displayedPhotos.length === 0 && (
-        <div className="glass-panel" style={{
-          padding: '60px 24px',
-          textAlign: 'center',
-          borderRadius: '16px',
-          border: '1px dashed var(--border-subtle)',
-          margin: '20px 0',
-        }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'rgba(6, 182, 212, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 16px',
-            color: '#38bdf8',
-          }}>
-            {matchedResults !== undefined ? <SearchX size={32} /> : <ImageOff size={32} />}
+        <div className="p-16 rounded-3xl bg-emerald-950/40 border border-emerald-800/40 text-center my-6">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-900/60 flex items-center justify-center mx-auto mb-3 text-amber-400">
+            {matchedResults !== undefined ? <SearchX className="w-7 h-7" /> : <ImageOff className="w-7 h-7" />}
           </div>
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px', color: '#fff' }}>
+          <h3 className="text-lg font-bold text-amber-200 mb-1">
             {matchedResults !== undefined ? 'No Matching Photos Found' : 'No Photos in this Category'}
           </h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto' }}>
+          <p className="text-xs text-emerald-400/60 max-w-sm mx-auto">
             {matchedResults !== undefined
-              ? 'We scanned the event photos, but could not detect a confident biometric match with this selfie. Try capturing a brighter, front-facing selfie.'
+              ? 'We scanned the event photos, but could not detect a confident match with this selfie. Try capturing a clearer front-facing selfie.'
               : 'Try selecting "All Photos" to see the full event album.'}
           </p>
         </div>
       )}
 
-      {/* Responsive Masonry Grid */}
+      {/* Responsive Gallery Grid */}
       {displayedPhotos.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '20px',
-        }}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {displayedPhotos.map((photo, idx) => {
             const isSelected = selectedPhotoIds.has(photo.id);
             const matchScore = getMatchScoreForPhoto(photo.id);
@@ -258,7 +204,6 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
             return (
               <div
                 key={photo.id}
-                className="glass-panel glass-panel-hover"
                 onClick={() => {
                   if (isSelectionMode) {
                     togglePhotoSelection(photo.id, { stopPropagation: () => {} } as any);
@@ -266,99 +211,66 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
                     setActiveLightboxIndex(idx);
                   }
                 }}
-                style={{
-                  position: 'relative',
-                  borderRadius: '14px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  aspectRatio: '4 / 3',
-                  border: isSelected ? '2px solid #8b5cf6' : '1px solid var(--border-subtle)',
-                  boxShadow: isSelected ? '0 0 25px rgba(139, 92, 246, 0.4)' : undefined,
-                }}
+                className={`relative rounded-2xl overflow-hidden cursor-pointer aspect-[4/3] bg-[#02140e] border transition-all duration-300 group ${
+                  isSelected
+                    ? 'border-amber-400 shadow-[0_0_24px_rgba(245,158,11,0.4)] ring-2 ring-amber-400'
+                    : 'border-emerald-800/60 hover:border-amber-400/60 hover:shadow-[0_8px_30px_rgba(0,0,0,0.5)]'
+                }`}
               >
                 {/* Photo Image */}
                 <img
                   src={photo.thumbnailUrl || photo.url}
                   alt={photo.title || `Event photo ${idx + 1}`}
                   loading="lazy"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    transition: 'transform 0.4s ease',
-                  }}
-                  onMouseOver={(e) => (e.currentTarget.style.transform = 'scale(1.04)')}
-                  onMouseOut={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
 
-                {/* Gradient overlay for hover text */}
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0) 100%)',
-                  opacity: isSelected ? 1 : 0.85,
-                  transition: 'opacity 0.2s',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  padding: '12px',
-                }}>
+                {/* Subtle Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-85 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-3 pointer-events-none">
                   {/* Top Corner: AI Match Score or Selection Checkbox */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="flex justify-between items-center pointer-events-auto">
                     {matchScore !== undefined ? (
-                      <span className="badge badge-ai" style={{ background: 'rgba(16, 185, 129, 0.25)', borderColor: 'rgba(16, 185, 129, 0.5)', color: '#34d399' }}>
-                        <Sparkles size={11} /> {Math.round(matchScore * 100)}% Match
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/80 text-emerald-950 text-[10px] font-bold shadow-md">
+                        <Sparkles className="w-3 h-3" /> {Math.round(matchScore * 100)}% Match
                       </span>
-                    ) : <div />}
+                    ) : (
+                      <div />
+                    )}
 
-                    {isSelectionMode ? (
+                    {isSelectionMode && (
                       <button
+                        type="button"
                         onClick={(e) => togglePhotoSelection(photo.id, e)}
-                        style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '6px',
-                          background: isSelected ? '#8b5cf6' : 'rgba(0,0,0,0.6)',
-                          border: '1px solid rgba(255,255,255,0.4)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#fff',
-                        }}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-amber-500 text-emerald-950 font-bold shadow-md'
+                            : 'bg-black/60 border border-white/40 text-white'
+                        }`}
                       >
-                        {isSelected && <Check size={16} strokeWidth={3} />}
+                        {isSelected && <Check className="w-4 h-4 stroke-[3]" />}
                       </button>
-                    ) : null}
+                    )}
                   </div>
 
                   {/* Bottom Corner: Quick Download & Details */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                  <div className="flex justify-between items-center pointer-events-auto">
+                    <span className="text-[11px] text-amber-200/90 font-medium truncate max-w-[70%]">
                       {photo.title || `Photo #${idx + 1}`}
                     </span>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        downloadSinglePhoto(photo, `event-photo-${idx + 1}.jpg`);
-                      }}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        background: 'rgba(255, 255, 255, 0.15)',
-                        backdropFilter: 'blur(6px)',
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        transition: 'all 0.2s',
-                      }}
-                      title="Download High-Res"
-                    >
-                      <Download size={14} />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          downloadSinglePhoto(photo, `event-photo-${idx + 1}.jpg`);
+                        }}
+                        className="w-7 h-7 rounded-lg bg-black/60 hover:bg-amber-500 hover:text-emerald-950 border border-white/20 text-white flex items-center justify-center transition-all"
+                        title="Download High-Res Photo"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -367,7 +279,7 @@ export default function GalleryGrid({ photos, matchedResults, eventTitle = 'Even
         </div>
       )}
 
-      {/* Lightbox component */}
+      {/* Lightbox Modal */}
       {activeLightboxIndex !== null && displayedPhotos.length > 0 && (
         <Lightbox
           photos={displayedPhotos}

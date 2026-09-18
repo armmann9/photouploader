@@ -227,7 +227,7 @@ function AdminPanelContent() {
             <div>
               <SectionHeader title="Colony Festival Panchang" subtitle="Manage puja timings, cultural programme schedule, and Mahaprasad hours." />
               <div className="mt-6 bg-emerald-950/60 p-6 rounded-3xl border border-emerald-700/50 shadow-sm backdrop-blur-sm">
-                <FestivalPanchangSchedule />
+                <FestivalPanchangSchedule readOnly={false} />
               </div>
             </div>
           )}

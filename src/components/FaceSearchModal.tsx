@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, X, RefreshCw, AlertCircle, Scan } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { PhotoItem, FaceMatchResult } from '@/lib/types';
 import {
   extractSelfieDescriptor,
@@ -206,13 +205,14 @@ export default function FaceSearchModal({ photos, onClose, onResultsFound }: Fac
       );
 
       // Trigger celebratory confetti only when real matches exist
-      if (matchedResults.length > 0) {
+      if (matchedResults.length > 0 && typeof window !== 'undefined') {
         try {
-          confetti({
+          const confettiModule = (await import('canvas-confetti')).default;
+          confettiModule({
             particleCount: 90,
             spread: 70,
             origin: { y: 0.6 },
-            colors: ['#06b6d4', '#8b5cf6', '#ec4899', '#10b981'],
+            colors: ['#6D1F2B', '#E29A34', '#F8F1E4'],
           });
         } catch (e) {}
       }

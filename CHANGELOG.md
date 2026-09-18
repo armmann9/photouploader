@@ -111,7 +111,7 @@ This file tracks all security, database, performance, and stability modification
   - Protects visitors against clickjacking, MIME sniffing, and unauthorized camera access.
   - Eliminates server-side image resizing proxy vulnerabilities (DoS CVE GHSA-9g9p-9gw9-jx7f) so images serve straight from Cloudflare CDN edge.
 * **How to Undo (Rollback)**:
-  - In Git: `git revert <commit-hash>`.
+  - In Git: `git revert b7760e2`.
 
 
 

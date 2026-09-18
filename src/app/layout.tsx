@@ -1,31 +1,29 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import { AuthProvider } from '@/lib/authContext';
 
 export const metadata: Metadata = {
-  title: 'EventLens AI — Smart Event Photo Distribution & AI Face Search',
-  description: 'Instantly find and download all your event photos in high resolution using AI face recognition. No WhatsApp compression, no manual hunting.',
-  keywords: ['event photography', 'photo sharing', 'AI face recognition', 'wedding photos', 'event gallery', 'face search'],
+  title: 'BPSCVS — Bani Park Sindhi Colony Vikas Samiti',
+  description:
+    'Community portal, events directory, AI face photo search, and administration for Bani Park Sindhi Colony Vikas Samiti.',
+  keywords: ['BPSCVS', 'Bani Park Sindhi Colony', 'Vikas Samiti', 'Jaipur', 'community events', 'photo gallery'],
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ backgroundColor: '#021812', color: '#FEF3C7' }}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <link rel="icon" href="/favicon.ico" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Rozha+One&family=Yatra+One&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body>
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-          <Navbar />
-          <main style={{ flex: 1 }}>{children}</main>
-          <Footer />
-        </div>
+      <body style={{ minHeight: '100vh', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

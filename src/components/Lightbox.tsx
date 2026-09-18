@@ -62,34 +62,36 @@ export default function Lightbox({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '10px 0',
+        flexWrap: 'wrap',
+        gap: '10px',
+        padding: '6px 0',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
             {currentIndex + 1} / {photos.length}
           </span>
           {matchScore !== undefined && (
-            <span className="badge badge-ai" style={{ background: 'rgba(16, 185, 129, 0.2)', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399' }}>
-              <UserCheck size={12} /> AI Match: {Math.round(matchScore * 100)}%
+            <span className="badge badge-ai" style={{ background: 'rgba(16, 185, 129, 0.2)', borderColor: 'rgba(16, 185, 129, 0.4)', color: '#34d399', fontSize: '0.72rem' }}>
+              <UserCheck size={12} /> {Math.round(matchScore * 100)}% Match
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             onClick={() => downloadSinglePhoto(photo, `event-photo-${currentIndex + 1}.jpg`)}
             className="btn-primary"
-            style={{ padding: '8px 18px', fontSize: '0.85rem' }}
+            style={{ padding: '7px 14px', fontSize: '0.8rem' }}
           >
-            <Download size={15} />
-            <span>Download High-Res</span>
+            <Download size={14} />
+            <span>Download</span>
           </button>
 
           <button
             onClick={onClose}
             style={{
-              width: '40px',
-              height: '40px',
+              width: '36px',
+              height: '36px',
               borderRadius: '50%',
               background: 'rgba(255, 255, 255, 0.1)',
               display: 'flex',
@@ -97,9 +99,10 @@ export default function Lightbox({
               justifyContent: 'center',
               color: '#fff',
               border: '1px solid var(--border-subtle)',
+              cursor: 'pointer',
             }}
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
       </div>

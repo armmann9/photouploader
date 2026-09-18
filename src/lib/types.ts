@@ -50,6 +50,9 @@ export interface EventItem {
   /** Event date in ISO format (e.g. "2026-08-24"). Used for sorting and display formatting. */
   date: string;
 
+  /** Event start time (e.g. "18:30" or "6:30 PM") */
+  time?: string;
+
   /** Venue / location text (e.g. "The Oberoi Palace, Udaipur") */
   location: string;
 
@@ -58,7 +61,16 @@ export interface EventItem {
   coverImage: string;
 
   /** Event category for filtering and badge display */
-  category: 'Wedding' | 'Corporate' | 'Birthday' | 'Concert' | 'Fashion' | 'Gala' | 'Other';
+  category: 'Wedding' | 'Corporate' | 'Birthday' | 'Concert' | 'Fashion' | 'Gala' | 'Community' | 'Deepotsav' | 'Cheti Chand' | 'Cultural' | 'National' | 'Other' | string;
+
+  /** Event status: upcoming or completed */
+  status?: 'upcoming' | 'completed';
+
+  /** Optional Google Maps venue URL */
+  mapUrl?: string;
+
+  /** Whether guest registration / RSVP is open */
+  registrationOpen?: boolean;
 
   /** Total number of photos uploaded to this event. Updated on each bulk upload batch. */
   photoCount: number;
