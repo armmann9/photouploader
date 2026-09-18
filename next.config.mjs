@@ -5,13 +5,26 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'images.unsplash.com',
       },
       {
-        protocol: 'http',
-        hostname: '**',
-      }
+        protocol: 'https',
+        hostname: '*.supabase.co',
+      },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: '/models/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+    ];
   },
   webpack: (config) => {
     config.resolve.fallback = {
@@ -20,6 +33,14 @@ const nextConfig = {
       path: false,
       crypto: false,
     };
+    // Suppress face-api.js "critical dependency" webpack warnings (harmless)
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings || []),
+      {
+        module: /face-api/,
+        message: /Critical dependency/,
+      },
+    ];
     return config;
   },
 };

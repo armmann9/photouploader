@@ -36,4 +36,21 @@ This file tracks all security, database, performance, and stability modification
   - Provides a self-contained, instant rollback mechanism via SQL.
 * **How to Undo (Rollback)**:
   - In Supabase: Run the `DOWN / REVERSE MIGRATION` SQL block at the bottom of `migrations/phase3_changes.sql`.
-  - In Git: `git checkout HEAD~1 -- supabase-schema.sql && rm migrations/phase3_changes.sql`.
+  - In Git: `git revert 4240e9c`
+
+### Item 3, Item 4 & Item 5: Column Mapping & AI Model Caching Headers
+* **Date**: September 2026
+* **Files Touched**:
+  1. [`src/lib/db.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/db.ts) (Verified / Mapped)
+  2. [`next.config.mjs`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/next.config.mjs) (Modified)
+* **One-Line Plain-English Summaries**:
+  - `src/lib/db.ts`: Standardized photographer contact field mapping to PostgreSQL `photographer_contact` (snake_case) in event creation and update queries.
+  - `next.config.mjs`: Added HTTP response headers caching `/models/*` for 1 year (`Cache-Control: public, max-age=31536000, immutable`) to eliminate redundant 12MB face recognition neural net downloads.
+  - `Item 3 (Indexes)`: Verified that all B-Tree and GIN indexes (`idx_photos_event_id`, `idx_photos_tags`, `idx_photos_faces`, `idx_events_slug`, `idx_rsvps_event_id`) are fully active in `migrations/phase3_changes.sql` and `supabase-schema.sql`.
+* **Why**:
+  - Without snake_case mapping, Supabase silently ignored `photographerContact` on event insertions.
+  - Without caching headers, static 12MB neural net weights were re-fetched across sessions, consuming client bandwidth.
+* **How to Undo (Rollback)**:
+  - Remove `headers()` method in `next.config.mjs`.
+  - In Git: `git revert <commit-hash>`.
+
