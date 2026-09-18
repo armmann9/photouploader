@@ -72,7 +72,7 @@ This file tracks all security, database, performance, and stability modification
   - Residents registering on single festival pages were not having their Mahaprasad headcount recorded.
   - The about route previously lacked navigation and matched an older light theme.
 * **How to Undo (Rollback)**:
-  - In Git: `git revert <commit-hash>`.
+  - In Git: `git revert c844a7a`.
 
 ---
 
@@ -95,6 +95,6 @@ This file tracks all security, database, performance, and stability modification
   - Eliminates ~55KB of dead code and duplicate zip implementations identified in the pre-deployment audit.
   - Enables media teams to upload real high-res albums directly from the photographer studio.
 * **How to Undo (Rollback)**:
-  - In Git: `git revert <commit-hash>`.
+  - In Git: `git revert affc3c8`.
 
 
