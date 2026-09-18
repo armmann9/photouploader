@@ -1,35 +1,3 @@
-/**
- * ============================================================================
- * EventLens AI — Guest Event Gallery Page (/event/[id]/page.tsx)
- * ============================================================================
- *
- * PURPOSE:
- *   This is the PRIMARY guest-facing page. When a guest scans the event QR code
- *   or opens the event link on their phone, THIS is the page they land on.
- *
- * FEATURES ON THIS PAGE:
- *   - Event banner hero with cover image, date, location, and photographer credit
- *   - "⚡ Find My Photos" AI face matcher button (opens FaceSearchModal)
- *   - Full responsive photo gallery grid with tag filters & batch downloads
- *   - Event QR code sharing modal
- *   - WhatsApp instant share button
- *   - PIN gate for private/protected events
- *   - Analytics tracking (page views, AI searches)
- *
- * DATA FLOW:
- *   1. URL param [id] → getEventById() → loads event metadata
- *   2. event.id → getPhotosByEventId() → loads all event photos
- *   3. Guest clicks AI → FaceSearchModal → returns FaceMatchResult[]
- *   4. Results filter GalleryGrid to show only matched photos
- *
- * CONNECTIONS:
- *   - db.ts        → getEventById(), getPhotosByEventId()
- *   - analytics.ts → trackPageView(), trackAISearch()
- *   - shareUtils.ts → shareViaWhatsApp()
- *   - Components  → GalleryGrid, FaceSearchModal, QRCodeModal, PinGate
- * ============================================================================
- */
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -39,64 +7,66 @@ import {
   Calendar,
   MapPin,
   Sparkles,
-  Download,
-  Share2,
-  QrCode,
   ArrowLeft,
-  RefreshCw,
-  UserCheck,
-  X,
-  FolderDown,
-  Camera,
-  ShieldCheck,
-  MessageCircle
+  QrCode,
+  CheckCircle2,
+  Users,
+  ExternalLink,
+  MessageCircle,
+  Clock,
+  Tag,
+  Share2,
+  Flame,
+  Award
 } from 'lucide-react';
-import { getEventById, getPhotosByEventId } from '@/lib/db';
+import { getEventById, getPhotosByEventId, saveRsvpRecord } from '@/lib/db';
+import { INITIAL_EVENTS, INITIAL_PHOTOS } from '@/lib/sampleData';
 import { EventItem, PhotoItem, FaceMatchResult } from '@/lib/types';
+import { EventRsvpRecord } from '@/types/utsav';
 import GalleryGrid from '@/components/GalleryGrid';
 import FaceSearchModal from '@/components/FaceSearchModal';
 import QRCodeModal from '@/components/QRCodeModal';
-import PinGate, { hasPinAccess } from '@/components/PinGate';
-import { downloadPhotosAsZip } from '@/lib/zipDownload';
-import { trackPageView, trackAISearch } from '@/lib/analytics';
-import { shareViaWhatsApp, shareViaNativeSheet } from '@/lib/shareUtils';
+import { shareViaWhatsApp } from '@/lib/shareUtils';
 
-export default function EventGalleryPage() {
-  const params = useParams();
+export default function SingleEventPage({ params: propParams }: { params?: { id: string } }) {
   const router = useRouter();
-  const eventIdOrSlug = params.id as string;
+  const hookParams = useParams();
+  const eventIdOrSlug = (propParams?.id || hookParams?.id || '') as string;
 
-  const [event, setEvent] = useState<EventItem | null>(null);
-  const [photos, setPhotos] = useState<PhotoItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const fallbackEvent = INITIAL_EVENTS.find(e => e.id === eventIdOrSlug || e.slug === eventIdOrSlug) || INITIAL_EVENTS[0];
+  const fallbackPhotos = fallbackEvent
+    ? INITIAL_PHOTOS.filter(p => p.eventId === fallbackEvent.id || p.eventId === fallbackEvent.slug)
+    : [];
 
-  // PIN Gate State — blocks gallery until correct PIN is entered
-  const [pinVerified, setPinVerified] = useState(false);
+  const [event, setEvent] = useState<EventItem | null>(fallbackEvent);
+  const [photos, setPhotos] = useState<PhotoItem[]>(fallbackPhotos);
+  const [loading, setLoading] = useState(false);
 
-  // AI Face Matching State
+  // RSVP state
+  const [rsvpStatus, setRsvpStatus] = useState<'attending' | 'tentative' | 'not_attending' | null>(null);
+  const [residentName, setResidentName] = useState('');
+  const [bungalowPlot, setBungalowPlot] = useState('');
+  const [phone, setPhone] = useState('');
+  const [guestCount, setGuestCount] = useState<number>(1);
+  const [dietPref, setDietPref] = useState<'regular' | 'jain' | 'falahar'>('regular');
+  const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
+  const [isSubmittingRsvp, setIsSubmittingRsvp] = useState(false);
+  const [rsvpError, setRsvpError] = useState<string | null>(null);
+
+  // AI & Modals
   const [showFaceModal, setShowFaceModal] = useState(false);
   const [matchedResults, setMatchedResults] = useState<FaceMatchResult[] | null>(null);
   const [userSelfieUrl, setUserSelfieUrl] = useState<string | null>(null);
   const [showQRModal, setShowQRModal] = useState(false);
 
-  // Batch download state
-  const [isZippingAll, setIsZippingAll] = useState(false);
-
   useEffect(() => {
     async function loadData() {
       if (!eventIdOrSlug) return;
-      setLoading(true);
       const evt = await getEventById(eventIdOrSlug);
       if (evt) {
         setEvent(evt);
         const photoList = await getPhotosByEventId(evt.id);
-        setPhotos(photoList);
-
-        // Check if PIN access was already granted this session
-        setPinVerified(hasPinAccess(evt.pinCode));
-
-        // Track page view analytics
-        trackPageView(evt.id);
+        setPhotos(photoList.length > 0 ? photoList : fallbackPhotos);
       }
       setLoading(false);
     }
@@ -107,270 +77,399 @@ export default function EventGalleryPage() {
     setMatchedResults(results);
     setUserSelfieUrl(selfieDataUrl);
     setShowFaceModal(false);
-
-    // Track AI search analytics
-    if (event) trackAISearch(event.id);
   };
 
-  const handleResetAIFilter = () => {
-    setMatchedResults(null);
-    setUserSelfieUrl(null);
+  const handleRsvpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rsvpStatus || !event) return;
+    if (!residentName.trim() || !bungalowPlot.trim()) {
+      setRsvpError('Please enter your family name and bungalow / plot number.');
+      return;
+    }
+    setRsvpError(null);
+    setIsSubmittingRsvp(true);
+
+    try {
+      const record: EventRsvpRecord = {
+        id: `rsvp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        eventId: event.id,
+        residentName: residentName.trim(),
+        bungalowPlot: bungalowPlot.trim(),
+        phone: phone.trim() || '+91 98290 XXXXX',
+        adultsCount: guestCount,
+        kidsCount: 0,
+        dietPreference: dietPref,
+        isAttending: rsvpStatus === 'attending',
+        notes: rsvpStatus === 'tentative' ? 'Tentative participation' : '',
+        createdAt: new Date().toISOString(),
+      };
+
+      await saveRsvpRecord(record);
+      setRsvpSubmitted(true);
+    } catch (err) {
+      console.error('RSVP submission error:', err);
+      setRsvpError('Failed to save RSVP. Please try again.');
+    } finally {
+      setIsSubmittingRsvp(false);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    } catch {
+      return dateStr;
+    }
   };
 
   const currentPhotos = matchedResults
     ? matchedResults.map((r) => r.photo)
     : photos;
 
-  if (loading) {
-    return (
-      <div style={{ textAlign: 'center', padding: '120px 0', color: 'var(--text-muted)' }}>
-        <RefreshCw size={32} className="animate-spin" style={{ margin: '0 auto 16px', color: '#06b6d4' }} />
-        <p>Loading Event Gallery...</p>
-      </div>
-    );
-  }
-
   if (!event) {
     return (
-      <div className="container" style={{ padding: '80px 0', textAlign: 'center' }}>
-        <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '12px' }}>Event Not Found</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
-          This event gallery does not exist or has been removed.
-        </p>
-        <Link href="/" className="btn-primary">
-          <ArrowLeft size={16} />
-          <span>Back to Home</span>
-        </Link>
-      </div>
-    );
-  }
-
-  // PIN Gate: if event is PIN-protected and not yet verified, show PIN numpad
-  if (event.pinCode && !pinVerified) {
-    return (
-      <PinGate
-        correctPin={event.pinCode}
-        eventTitle={event.title}
-        onSuccess={() => setPinVerified(true)}
-      />
-    );
-  }
-
-  return (
-    <div style={{ paddingBottom: '80px' }}>
-      {/* Event Banner Hero */}
-      <div style={{
-        position: 'relative',
-        minHeight: '340px',
-        display: 'flex',
-        alignItems: 'flex-end',
-        padding: '60px 0 40px',
-        overflow: 'hidden',
-      }}>
-        {/* Background Event Image with dark blur vignette */}
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage: `url(${event.coverImage || 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1600&q=80'})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'brightness(0.35) blur(2px)',
-          transform: 'scale(1.05)',
-          zIndex: 0,
-        }} />
-
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(to top, var(--bg-primary) 0%, rgba(7, 9, 14, 0.7) 60%, rgba(7, 9, 14, 0.4) 100%)',
-          zIndex: 1,
-        }} />
-
-        <div className="container" style={{ position: 'relative', zIndex: 2, width: '100%' }}>
-          {/* Back Navigation & Category */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-            <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              <ArrowLeft size={16} />
-              <span>All Events</span>
-            </Link>
-
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="badge badge-event">{event.category || 'Event'}</span>
-              <span className="badge badge-count">{photos.length} Total Photos</span>
-            </div>
-          </div>
-
-          {/* Title & Metadata */}
-          <h1 style={{
-            fontSize: 'clamp(1.8rem, 4vw, 3rem)',
-            fontWeight: 900,
-            marginBottom: '12px',
-            lineHeight: '1.2',
-          }}>
-            {event.title}
-          </h1>
-
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '20px',
-            flexWrap: 'wrap',
-            fontSize: '0.9rem',
-            color: 'var(--text-muted)',
-            marginBottom: '28px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Calendar size={16} color="#a855f7" />
-              <span>{new Date(event.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
-            </div>
-            {event.location && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin size={16} color="#06b6d4" />
-                <span>{event.location}</span>
-              </div>
-            )}
-            {event.photographerName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Camera size={16} color="#10b981" />
-                <span>Captured by {event.photographerName}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Main Action Bar for Guests */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            flexWrap: 'wrap',
-          }}>
-            {/* Find My Photos AI Button */}
-            <button
-              onClick={() => setShowFaceModal(true)}
-              className="btn-ai animate-pulse-glow"
-              style={{ padding: '14px 28px', fontSize: '1rem' }}
-            >
-              <Sparkles size={18} />
-              <span>⚡ Find My Photos (AI Matcher)</span>
-            </button>
-
-            <button
-              onClick={() => setShowQRModal(true)}
-              className="btn-secondary"
-              style={{ padding: '14px 20px', fontSize: '0.9rem' }}
-            >
-              <QrCode size={18} />
-              <span>Event QR Code</span>
-            </button>
-
-            {/* WhatsApp Share Button */}
-            <button
-              onClick={() => shareViaWhatsApp(event)}
-              className="btn-secondary"
-              style={{ padding: '14px 20px', fontSize: '0.9rem', background: 'rgba(37, 211, 102, 0.15)', borderColor: 'rgba(37, 211, 102, 0.4)', color: '#25d366' }}
-            >
-              <MessageCircle size={18} />
-              <span>Share via WhatsApp</span>
-            </button>
-
-            {/* Native Share / Copy Link */}
-            <button
-              onClick={() => shareViaNativeSheet(event)}
-              className="btn-secondary"
-              style={{ padding: '14px 20px', fontSize: '0.9rem' }}
-            >
-              <Share2 size={18} />
-              <span>Share Link</span>
-            </button>
-
-            <Link
-              href={`/admin/upload/${event.id}`}
-              className="btn-secondary"
-              style={{ padding: '14px 20px', fontSize: '0.9rem' }}
-            >
-              <Camera size={18} />
-              <span>Upload Photos (+200)</span>
-            </Link>
-          </div>
+      <div className="min-h-screen bg-[#021812] text-amber-50 flex flex-col items-center justify-center px-4">
+        <div className="bg-emerald-950/80 border border-emerald-700/50 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
+          <h2 className="text-2xl font-bold text-amber-300 mb-2">Festival Not Found</h2>
+          <p className="text-emerald-300/70 text-sm mb-6">This celebration album does not exist or has been archived.</p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-emerald-950 font-bold text-sm shadow-lg hover:from-amber-400 hover:to-yellow-400 transition-all"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Community Home</span>
+          </Link>
         </div>
       </div>
+    );
+  }
 
-      {/* Main Gallery Area */}
-      <div className="container" style={{ marginTop: '36px' }}>
-        
-        {/* AI Filter Active Notice Banner */}
-        {matchedResults && (
-          <div style={{
-            background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)',
-            border: '1px solid rgba(6, 182, 212, 0.4)',
-            borderRadius: '16px',
-            padding: '18px 24px',
-            marginBottom: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            flexWrap: 'wrap',
-            gap: '16px',
-            boxShadow: 'var(--shadow-cyan-glow)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              {userSelfieUrl && (
-                <div style={{
-                  width: '52px',
-                  height: '52px',
-                  borderRadius: '50%',
-                  overflow: 'hidden',
-                  border: '2px solid #06b6d4',
-                  boxShadow: '0 0 15px rgba(6, 182, 212, 0.5)',
-                  flexShrink: 0,
-                }}>
-                  <img src={userSelfieUrl} alt="Your selfie" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              )}
+  const isUpcoming = event.status === 'upcoming' || (!event.status && new Date(event.date) >= new Date());
+
+  return (
+    <div className="min-h-screen bg-[#021812] text-amber-50 selection:bg-amber-500 selection:text-emerald-950 font-sans relative overflow-x-hidden">
+      {/* Background Lighting & Atmosphere */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden">
+        <div className="absolute top-[-10%] left-[-5%] w-[650px] h-[650px] rounded-full bg-amber-500/[0.06] blur-[120px]" />
+        <div className="absolute top-1/3 right-[-10%] w-[650px] h-[650px] rounded-full bg-emerald-500/[0.07] blur-[120px]" />
+        <div className="absolute bottom-[-10%] left-1/3 w-[800px] h-[800px] rounded-full bg-amber-400/[0.03] blur-[140px]" />
+      </div>
+
+      {/* Top Navbar Header */}
+      <header className="relative z-20 px-6 sm:px-12 py-4 flex items-center justify-between border-b border-amber-500/10 backdrop-blur-md bg-emerald-950/30">
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-[0_0_16px_rgba(245,158,11,0.35)] group-hover:scale-105 transition-transform">
+            <Flame className="w-4 h-4 text-[#021812] fill-current" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-display font-bold text-base text-amber-300 tracking-wider">BPSCVS</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-semibold border border-amber-400/30">GALLERY</span>
+            </div>
+          </div>
+        </Link>
+
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-emerald-300/80 hover:text-amber-300 px-4 py-2 rounded-xl bg-emerald-900/40 border border-emerald-700/40 hover:border-amber-400/50 transition-all shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Community Portal</span>
+          </Link>
+          <Link
+            href="/login"
+            className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-amber-400 hover:text-amber-300 px-3.5 py-2 rounded-xl bg-amber-500/10 border border-amber-400/30 hover:bg-amber-500/20 transition-all"
+          >
+            <span>🔐 Staff Portal</span>
+          </Link>
+        </div>
+      </header>
+
+      {/* Event Hero Banner Section */}
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 py-8">
+        <div className="p-6 sm:p-10 rounded-3xl bg-gradient-to-br from-emerald-950/80 via-emerald-900/40 to-[#021812]/90 border border-amber-500/30 shadow-[0_24px_80px_rgba(0,0,0,0.6)] backdrop-blur-xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Left Column: Details & Action Buttons */}
+            <div className="lg:col-span-8 flex flex-col justify-between">
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#fff' }}>
-                    AI Face Search Results
-                  </h3>
-                  <span className="badge badge-ai">
-                    <UserCheck size={12} /> {matchedResults.length} Photos Found
+                {/* Badges & Status */}
+                <div className="flex items-center gap-2.5 mb-4 flex-wrap">
+                  <span className="text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 font-bold shadow-sm">
+                    {event.category || 'Festival Utsav'}
+                  </span>
+                  <span
+                    className={`text-xs px-3 py-1 rounded-full font-bold shadow-sm ${
+                      isUpcoming
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40'
+                        : 'bg-yellow-500/20 text-yellow-300 border border-yellow-400/40'
+                    }`}
+                  >
+                    {isUpcoming ? '🟢 Upcoming Celebration' : '⚪ Completed Archive'}
+                  </span>
+                  <span className="text-xs px-3 py-1 rounded-full bg-emerald-900/40 text-emerald-300 border border-emerald-700/50 font-semibold">
+                    📸 {photos.length} Photos in Vault
                   </span>
                 </div>
-                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>
-                  Filtered to show only pictures where you are recognized.
-                </p>
+
+                {/* Festival Title */}
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-display font-bold text-amber-100 leading-tight mb-4">
+                  {event.title}
+                </h1>
+
+                {/* Date & Location Pill Row */}
+                <div className="flex flex-wrap gap-4 text-xs sm:text-sm text-emerald-200/90 mb-5">
+                  <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-900/50 border border-emerald-700/50">
+                    <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>{formatDate(event.date)}</span>
+                  </div>
+                  {event.time && (
+                    <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-900/50 border border-emerald-700/50">
+                      <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>{event.time} IST</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-900/50 border border-emerald-700/50">
+                    <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>{event.location}</span>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {event.description && (
+                  <p className="text-emerald-300/80 text-sm sm:text-base leading-relaxed mb-8">
+                    {event.description}
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons Row */}
+              <div className="flex items-center gap-3 flex-wrap pt-4 border-t border-emerald-800/40">
+                {/* ⚡ AI Face Finder Button */}
+                <button
+                  onClick={() => setShowFaceModal(true)}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-emerald-950 font-bold text-sm shadow-[0_4px_20px_rgba(245,158,11,0.35)] transition-all active:scale-95"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Find My Photos (AI Matcher)</span>
+                </button>
+
+                {/* QR Code Poster */}
+                <button
+                  onClick={() => setShowQRModal(true)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-900/60 hover:bg-emerald-800/80 border border-emerald-700/60 text-emerald-200 font-semibold text-sm transition-all active:scale-95"
+                >
+                  <QrCode className="w-4 h-4 text-amber-400" />
+                  <span>QR Code</span>
+                </button>
+
+                {/* WhatsApp Share */}
+                <button
+                  onClick={() => shareViaWhatsApp(event)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#4ade80] font-semibold text-sm transition-all active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4 text-[#25D366]" />
+                  <span>WhatsApp Share</span>
+                </button>
+
+                {/* Google Maps Link */}
+                {event.mapUrl && (
+                  <a
+                    href={event.mapUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 px-4 py-3 rounded-xl bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 text-emerald-300 text-sm transition-all"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Venue Map</span>
+                  </a>
+                )}
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                onClick={() => setShowFaceModal(true)}
-                className="btn-secondary"
-                style={{ padding: '8px 16px', fontSize: '0.8rem' }}
-              >
-                Scan Another Selfie
-              </button>
+            {/* Right Column: Event Cover & RSVP / Organizer Card */}
+            <div className="lg:col-span-4 flex flex-col gap-4">
+              {/* Cover Image */}
+              <div className="relative rounded-2xl overflow-hidden border border-amber-500/30 shadow-xl aspect-[16/10] bg-[#021812]">
+                <img
+                  src={event.coverImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=800&q=80'}
+                  alt={event.title}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute bottom-3 left-3 right-3 text-xs text-amber-200/90 font-medium">
+                  📍 {event.location}
+                </div>
+              </div>
 
-              <button
-                onClick={handleResetAIFilter}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  color: '#fff',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                }}
-              >
-                <X size={14} />
-                <span>Show All Photos</span>
-              </button>
+              {/* RSVP Card or Samiti Info */}
+              <div className="p-5 rounded-2xl bg-emerald-950/80 border border-emerald-800/60 shadow-lg">
+                {event.registrationOpen ? (
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-bold text-amber-300 mb-3">
+                      <Users className="w-4 h-4 text-amber-400" />
+                      <span>RSVP for this Celebration</span>
+                    </div>
+
+                    {rsvpSubmitted ? (
+                      <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-center text-emerald-300">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto mb-1.5" />
+                        <div className="font-bold text-sm">RSVP Confirmed!</div>
+                        <p className="text-xs text-emerald-400/70 mt-1">
+                          We look forward to welcoming your family at the Samiti Hall.
+                        </p>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleRsvpSubmit} className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setRsvpStatus('attending')}
+                            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                              rsvpStatus === 'attending'
+                                ? 'bg-emerald-500 text-emerald-950 border-emerald-400'
+                                : 'bg-emerald-900/40 border-emerald-700/50 text-emerald-300'
+                            }`}
+                          >
+                            ✓ Attending
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRsvpStatus('tentative')}
+                            className={`py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                              rsvpStatus === 'tentative'
+                                ? 'bg-amber-500 text-emerald-950 border-amber-400'
+                                : 'bg-emerald-900/40 border-emerald-700/50 text-emerald-300'
+                            }`}
+                          >
+                            Tentative
+                          </button>
+                        </div>
+
+                        {rsvpError && (
+                          <p className="text-[11px] text-amber-300 bg-amber-950/60 border border-amber-500/40 rounded-lg px-2.5 py-1.5">
+                            {rsvpError}
+                          </p>
+                        )}
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-emerald-300/80 mb-1">
+                            Resident / Family Name <span className="text-amber-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={residentName}
+                            onChange={(e) => setResidentName(e.target.value)}
+                            placeholder="e.g. Ramesh Wadhwani & Family"
+                            className="w-full bg-[#021812]/90 border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-amber-100 placeholder:text-emerald-400/30 focus:outline-none focus:border-amber-400"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-emerald-300/80 mb-1">
+                              Bungalow / Plot <span className="text-amber-400">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={bungalowPlot}
+                              onChange={(e) => setBungalowPlot(e.target.value)}
+                              placeholder="e.g. Plot 14-B"
+                              className="w-full bg-[#021812]/90 border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-amber-100 placeholder:text-emerald-400/30 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-emerald-300/80 mb-1">
+                              Phone (Optional)
+                            </label>
+                            <input
+                              type="tel"
+                              value={phone}
+                              onChange={(e) => setPhone(e.target.value)}
+                              placeholder="+91 98290 XXXXX"
+                              className="w-full bg-[#021812]/90 border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-amber-100 placeholder:text-emerald-400/30 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-emerald-300/80 mb-1">Diet Preference</label>
+                          <select
+                            value={dietPref}
+                            onChange={(e) => setDietPref(e.target.value as 'regular' | 'jain' | 'falahar')}
+                            className="w-full bg-[#021812]/90 border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-amber-100 focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="regular">Satvik Regular Mahaprasad</option>
+                            <option value="jain">Pure Jain (No root vegetables)</option>
+                            <option value="falahar">Vrat Falahari</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-emerald-300/80 mb-1">Family Members Count</label>
+                          <select
+                            value={guestCount}
+                            onChange={(e) => setGuestCount(Number(e.target.value))}
+                            className="w-full bg-[#021812]/90 border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-amber-100 focus:outline-none focus:border-amber-400"
+                          >
+                            <option value={1}>1 person</option>
+                            <option value={2}>2 persons</option>
+                            <option value={3}>3 persons</option>
+                            <option value={4}>4 persons</option>
+                            <option value={5}>5+ persons</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={!rsvpStatus || isSubmittingRsvp}
+                          className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-emerald-950 font-bold text-xs shadow-md transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {isSubmittingRsvp ? 'Submitting...' : 'Submit RSVP'}
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-2 text-xs text-emerald-300/70">
+                    <Award className="w-5 h-5 text-amber-400 mx-auto mb-1.5" />
+                    <div>Organized by <strong className="text-amber-300">{event.photographerName || 'BPSCVS Samiti'}</strong></div>
+                    <p className="text-[11px] text-emerald-400/50 mt-1">Bani Park Sindhi Colony Vikas Samiti</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        )}
+        </div>
+      </section>
+
+      {/* Event Photo Gallery Section */}
+      <section className="relative z-10 max-w-7xl mx-auto px-4 sm:px-8 py-8 pb-20">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-display font-bold text-amber-200">
+              Celebration Photo Gallery
+            </h2>
+            <p className="text-xs sm:text-sm text-emerald-300/70 mt-1">
+              {matchedResults
+                ? `Showing ${matchedResults.length} photos matched with your facial selfie`
+                : `High-resolution photographs from this festival (${photos.length} photos)`}
+            </p>
+          </div>
+
+          {matchedResults && (
+            <button
+              onClick={() => { setMatchedResults(null); setUserSelfieUrl(null); }}
+              className="px-4 py-2 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700 text-amber-300 text-xs font-bold transition-all"
+            >
+              ✕ Clear AI Match & Show All Photos
+            </button>
+          )}
+        </div>
 
         {/* Gallery Grid */}
         <GalleryGrid
@@ -378,9 +477,9 @@ export default function EventGalleryPage() {
           matchedResults={matchedResults || undefined}
           eventTitle={event.title}
         />
-      </div>
+      </section>
 
-      {/* AI Face Search Modal */}
+      {/* Face Search Modal */}
       {showFaceModal && (
         <FaceSearchModal
           photos={photos}
@@ -389,7 +488,7 @@ export default function EventGalleryPage() {
         />
       )}
 
-      {/* QR Code Sharing Modal */}
+      {/* QR Modal */}
       {showQRModal && (
         <QRCodeModal
           event={event}

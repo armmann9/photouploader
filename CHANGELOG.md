@@ -52,5 +52,49 @@ This file tracks all security, database, performance, and stability modification
   - Without caching headers, static 12MB neural net weights were re-fetched across sessions, consuming client bandwidth.
 * **How to Undo (Rollback)**:
   - Remove `headers()` method in `next.config.mjs`.
+  - In Git: `git revert fbe1a10`.
+
+---
+
+## Phase 4 — Functional Bug Fixes & Persistence
+
+### Single Event RSVP, About Page Styling & Scope Cleanup
+* **Date**: September 2026
+* **Files Touched**:
+  1. [`src/app/event/[id]/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/event/[id]/page.tsx) (Modified)
+  2. [`src/app/about/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/about/page.tsx) (New/Styled)
+  3. [`src/app/admin/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/admin/page.tsx) (Cleaned)
+* **One-Line Plain-English Summaries**:
+  - `src/app/event/[id]/page.tsx`: Connected single event page RSVP form directly to `saveRsvpRecord()` so guest meal choices, family counts, and bungalow numbers persist to Supabase / LocalStorage instead of disappearing.
+  - `src/app/about/page.tsx`: Re-skinned `/about` page in Deepotsav dark emerald/gold theme with sticky navigation header (Home, Events, Admin) so visitors are never stranded.
+  - `src/app/admin/page.tsx`: Cleaned out obsolete resident photo moderation queue per approved scope change (only admins/photographers upload albums via `BulkUploader`).
+* **Why**:
+  - Residents registering on single festival pages were not having their Mahaprasad headcount recorded.
+  - The about route previously lacked navigation and matched an older light theme.
+* **How to Undo (Rollback)**:
   - In Git: `git revert <commit-hash>`.
+
+---
+
+## Phase 5 — Codebase Cleanup & Utility Consolidation
+
+### Component Pruning & Zip Service Consolidation
+* **Date**: September 2026
+* **Files Touched**:
+  1. [`src/components/CloudConfigModal.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/CloudConfigModal.tsx) (Deleted)
+  2. [`src/components/Footer.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/Footer.tsx) (Deleted)
+  3. [`src/components/Navbar.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/Navbar.tsx) (Deleted)
+  4. [`src/components/PinGate.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/components/PinGate.tsx) (Deleted)
+  5. [`src/lib/zipService.ts`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/lib/zipService.ts) (Consolidated)
+  6. [`src/app/studio/page.tsx`](file:///c:/Users/sahill/OneDrive/Desktop/photouploader/src/app/studio/page.tsx) (Connected to real `BulkUploader`)
+* **One-Line Plain-English Summaries**:
+  - Pruned dead/unreferenced components (`CloudConfigModal`, `Footer`, `Navbar`, `PinGate`, `FaceMatchFinder`, `SocietyTechGuide`) to reduce bundle size and maintainer confusion.
+  - Consolidated dual zip utilities into a single authoritative `zipService.ts` module with backwards-compatible re-exports.
+  - Replaced the mock photo uploader simulation on `/studio` with the real `BulkUploader` component.
+* **Why**:
+  - Eliminates ~55KB of dead code and duplicate zip implementations identified in the pre-deployment audit.
+  - Enables media teams to upload real high-res albums directly from the photographer studio.
+* **How to Undo (Rollback)**:
+  - In Git: `git revert <commit-hash>`.
+
 
