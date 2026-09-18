@@ -16,7 +16,7 @@ import {
   ChevronRight, ShieldCheck, Download, Search,
   Printer, Bell, Menu, ArrowUpRight, Camera, QrCode, Sparkles, MapPin, RefreshCw,
   Sliders, Settings, SunDim, Palette, Lightbulb, Save, CheckCircle2, Globe, Database, Radio, Flame,
-  UserCheck, Phone
+  UserCheck, Phone, ToggleLeft, ToggleRight, Share2, Link2, Copy
 } from 'lucide-react';
 import QRCodeModal from '@/components/QRCodeModal';
 import {
@@ -647,16 +647,61 @@ function RsvpRosterSection({ showToast }: { showToast: (m: string) => void }) {
   const [events, setEvents] = useState<FestivalEvent[]>(FESTIVAL_EVENTS);
   const [selectedEventId, setSelectedEventId] = useState<string>('diwali-2024');
   const [rsvpList, setRsvpList] = useState<EventRsvpRecord[]>(INITIAL_RSVP_RECORDS);
-
-  // Form State
-  const [residentName, setResidentName] = useState('');
-  const [bungalowPlot, setBungalowPlot] = useState('');
-  const [phone, setPhone] = useState('');
-  const [adultsCount, setAdultsCount] = useState(2);
-  const [kidsCount, setKidsCount] = useState(1);
-  const [dietPreference, setDietPreference] = useState<'regular' | 'jain' | 'falahar'>('regular');
-  const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
+
+  // ─── RSVP Form Settings state ─────────────────────────────────────────────
+  const [rsvpEnabled, setRsvpEnabled] = useState(true);
+  const [rsvpDeadline, setRsvpDeadline] = useState('');
+  const [welcomeMsg, setWelcomeMsg] = useState('Join us for Deepotsav! Please fill in your family details to confirm attendance and Mahaprasad arrangements.');
+  const [dietOptions, setDietOptions] = useState({ regular: true, jain: true, falahar: true });
+  const [settingsSaved, setSettingsSaved] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Public RSVP URL — constructed at runtime
+  const rsvpUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/event/${selectedEventId}#rsvp`
+    : `/event/${selectedEventId}#rsvp`;
+
+  const waText = encodeURIComponent(`🙏 *BPSCVS Festival RSVP*\n\nKindly confirm your family's attendance for the upcoming festival celebration.\n\n👇 Register here:\n${rsvpUrl}\n\n— Bani Park Sindhi Colony Vikas Samiti`);
+  const waShareUrl = `https://wa.me/?text=${waText}`;
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(rsvpUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+      showToast('🔗 RSVP link copied!');
+    } catch {
+      showToast('⚠️ Could not copy link automatically.');
+    }
+  };
+
+  const saveSettings = () => {
+    try {
+      localStorage.setItem('bpscvs_rsvp_settings', JSON.stringify({
+        rsvpEnabled, rsvpDeadline, welcomeMsg, dietOptions,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch {}
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 2500);
+    showToast('✅ RSVP form settings saved!');
+    playTempleBell(980);
+  };
+
+  // Load saved settings on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('bpscvs_rsvp_settings');
+      if (saved) {
+        const s = JSON.parse(saved);
+        if (s.rsvpEnabled !== undefined) setRsvpEnabled(s.rsvpEnabled);
+        if (s.rsvpDeadline) setRsvpDeadline(s.rsvpDeadline);
+        if (s.welcomeMsg) setWelcomeMsg(s.welcomeMsg);
+        if (s.dietOptions) setDietOptions(s.dietOptions);
+      }
+    } catch {}
+  }, []);
 
   // Load RSVPs and Events on mount
   useEffect(() => {
@@ -706,42 +751,7 @@ function RsvpRosterSection({ showToast }: { showToast: (m: string) => void }) {
   const jainCount = displayedRsvps.filter(r => r.dietPreference === 'jain').length;
   const falaharCount = displayedRsvps.filter(r => r.dietPreference === 'falahar').length;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!residentName.trim() || !bungalowPlot.trim()) {
-      showToast('⚠️ Please enter Resident Name and Bungalow Plot number');
-      return;
-    }
 
-    const newRecord: EventRsvpRecord = {
-      id: `rsvp-${Date.now()}`,
-      eventId: selectedEventId === 'all' ? (events[0]?.id || 'diwali-2024') : selectedEventId,
-      residentName: residentName.trim(),
-      bungalowPlot: bungalowPlot.trim(),
-      phone: phone.trim() || '+91 98290 XXXXX',
-      adultsCount,
-      kidsCount,
-      dietPreference,
-      isAttending: true,
-      notes: notes.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    const updated = [newRecord, ...rsvpList];
-    saveRsvps(updated);
-
-    // Reset form
-    setResidentName('');
-    setBungalowPlot('');
-    setPhone('');
-    setAdultsCount(2);
-    setKidsCount(1);
-    setNotes('');
-
-    playTempleBell(980);
-    triggerPhoolBarsao();
-    showToast(`✅ RSVP registered for ${residentName} (${adultsCount + kidsCount} Pax)!`);
-  };
 
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to remove this RSVP registration?')) {
@@ -876,168 +886,158 @@ function RsvpRosterSection({ showToast }: { showToast: (m: string) => void }) {
         </div>
       </div>
 
-      {/* ── Main Two-Column Layout: Create RSVP Form & Confirmed Roster ── */}
+      {/* ── Main Two-Column Layout: RSVP Settings + Confirmed Roster ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Interactive RSVP Form (Create/Register Attendance) */}
-        <div className="lg:col-span-6 bg-emerald-950/70 border border-emerald-800/80 rounded-3xl p-5 sm:p-7 shadow-lg backdrop-blur-sm">
-          <div className="flex items-center gap-2 mb-4 pb-3 border-b border-emerald-800/60">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            <h3 className="text-base sm:text-lg font-bold font-display text-amber-200 truncate">
-              Quick Attendance RSVP ({activeEvent?.title || 'Selected Festival'})
-            </h3>
+        {/* Left Column: RSVP Form Settings & Share */}
+        <div className="lg:col-span-6 space-y-4">
+
+          {/* ── Enable / Disable Toggle ── */}
+          <div className="bg-emerald-950/70 border border-emerald-800/80 rounded-3xl p-5 shadow-lg backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-emerald-800/60">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-amber-400" />
+                <h3 className="text-base font-bold font-display text-amber-200">RSVP Form Settings</h3>
+              </div>
+              <button
+                onClick={() => setRsvpEnabled(p => !p)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
+                  rsvpEnabled
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                    : 'bg-emerald-900/60 text-emerald-400 border-emerald-700'
+                }`}
+              >
+                {rsvpEnabled
+                  ? <><ToggleRight className="w-4 h-4 text-amber-400" /> RSVP ON</>
+                  : <><ToggleLeft className="w-4 h-4 text-emerald-500" /> RSVP OFF</>}
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Welcome Message */}
+              <div>
+                <label className="block text-[10px] font-semibold text-emerald-300/80 mb-1 uppercase tracking-wider">
+                  Welcome Message shown on RSVP form
+                </label>
+                <textarea
+                  value={welcomeMsg}
+                  onChange={e => setWelcomeMsg(e.target.value)}
+                  rows={3}
+                  className="w-full bg-[#021812]/80 border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-amber-100 placeholder:text-emerald-400/30 focus:outline-none focus:border-amber-400 transition-colors resize-none"
+                  placeholder="Invite message for residents..."
+                />
+              </div>
+
+              {/* Deadline */}
+              <div>
+                <label className="block text-[10px] font-semibold text-emerald-300/80 mb-1 uppercase tracking-wider">
+                  RSVP Deadline (optional)
+                </label>
+                <input
+                  type="date"
+                  value={rsvpDeadline}
+                  onChange={e => setRsvpDeadline(e.target.value)}
+                  className="w-full bg-[#021812]/80 border border-emerald-700/60 rounded-xl px-3 py-2 text-xs text-amber-100 focus:outline-none focus:border-amber-400 transition-colors"
+                />
+                {rsvpDeadline && (
+                  <p className="text-[10px] text-amber-400/70 mt-1">Form closes after {new Date(rsvpDeadline).toDateString()}</p>
+                )}
+              </div>
+
+              {/* Diet Options Toggle */}
+              <div>
+                <label className="block text-[10px] font-semibold text-emerald-300/80 mb-2 uppercase tracking-wider">
+                  Diet Preference Options to show on form
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'regular', label: '🍛 Satvik Regular' },
+                    { id: 'jain', label: '🌿 Pure Jain' },
+                    { id: 'falahar', label: '🥛 Vrat Falahar' },
+                  ].map(d => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDietOptions(p => ({ ...p, [d.id]: !p[d.id as keyof typeof p] }))}
+                      className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border ${
+                        dietOptions[d.id as keyof typeof dietOptions]
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-400/40'
+                          : 'bg-emerald-900/40 text-emerald-400/60 border-emerald-700/40 line-through'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Save Settings Button */}
+              <button
+                onClick={saveSettings}
+                className={`flex items-center gap-2 w-full justify-center py-2.5 rounded-xl font-bold text-xs transition-all ${
+                  settingsSaved
+                    ? 'bg-emerald-500/20 border border-emerald-400/50 text-emerald-300'
+                    : 'bg-gradient-to-r from-amber-500 to-yellow-400 text-emerald-950 shadow-md hover:scale-[1.02]'
+                }`}
+              >
+                {settingsSaved ? <><Check className="w-3.5 h-3.5" /> Settings Saved!</> : <><Save className="w-3.5 h-3.5" /> Save RSVP Form Settings</>}
+              </button>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-emerald-200 mb-1">
-                  Resident Name (श्री / श्रीमती) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={residentName}
-                  onChange={(e) => setResidentName(e.target.value)}
-                  placeholder="e.g. Ramesh Wadhwani"
-                  className="w-full px-3.5 py-2 rounded-xl bg-emerald-900/50 border border-emerald-700/80 text-amber-50 text-xs placeholder:text-emerald-500 focus:outline-none focus:border-amber-400"
+          {/* ── Share RSVP Form QR + Link ── */}
+          <div className="bg-emerald-950/70 border border-amber-400/30 rounded-3xl p-5 shadow-lg backdrop-blur-sm">
+            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-emerald-800/60">
+              <Share2 className="w-4 h-4 text-amber-400" />
+              <h3 className="text-base font-bold font-display text-amber-200">Share RSVP Form</h3>
+            </div>
+
+            <div className="flex flex-col items-center gap-4">
+              {/* QR Code via external API */}
+              <div className="bg-white p-3 rounded-2xl shadow-xl">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(rsvpUrl)}&color=021812&bgcolor=ffffff`}
+                  alt="RSVP QR Code"
+                  width={160}
+                  height={160}
+                  className="rounded-xl"
                 />
               </div>
+              <p className="text-[11px] text-emerald-300/70 text-center">
+                Admin can screenshot this QR code and share in colony WhatsApp groups.
+              </p>
 
-              <div>
-                <label className="block text-xs font-semibold text-emerald-200 mb-1">
-                  Bungalow / Plot No. *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={bungalowPlot}
-                  onChange={(e) => setBungalowPlot(e.target.value)}
-                  placeholder="e.g. Plot 24-B, Main Road"
-                  className="w-full px-3.5 py-2 rounded-xl bg-emerald-900/50 border border-emerald-700/80 text-amber-50 text-xs placeholder:text-emerald-500 focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-emerald-200 mb-1">
-                WhatsApp Contact (Optional for Event Updates)
-              </label>
-              <div className="relative">
-                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-emerald-400" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98290 12345"
-                  className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-emerald-900/50 border border-emerald-700/80 text-amber-50 text-xs placeholder:text-emerald-500 focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            </div>
-
-            {/* Adults & Kids Count Pickers */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 rounded-xl bg-emerald-900/40 border border-emerald-800">
-                <label className="block text-[11px] font-bold text-amber-300 mb-0.5">
-                  Adults (वयस्क)
-                </label>
-                <span className="text-[10px] text-emerald-400 block mb-2">12+ years</span>
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setAdultsCount((prev) => Math.max(1, prev - 1))}
-                    className="w-7 h-7 rounded-lg bg-emerald-950 hover:bg-emerald-800 border border-emerald-700 text-amber-300 flex items-center justify-center font-bold text-sm"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-base font-bold font-mono text-white">{adultsCount}</span>
-                  <button
-                    type="button"
-                    onClick={() => setAdultsCount((prev) => prev + 1)}
-                    className="w-7 h-7 rounded-lg bg-emerald-950 hover:bg-emerald-800 border border-emerald-700 text-amber-300 flex items-center justify-center font-bold text-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              {/* RSVP Link */}
+              <div className="w-full bg-[#021812]/80 border border-emerald-700/60 rounded-xl px-3 py-2 flex items-center gap-2">
+                <Link2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-[11px] text-amber-200/80 truncate flex-1 font-mono">{rsvpUrl}</span>
+                <button
+                  onClick={copyLink}
+                  className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                    copiedLink ? 'bg-emerald-500/30 text-emerald-300' : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
+                  }`}
+                >
+                  {copiedLink ? '✓ Copied!' : <><Copy className="w-3 h-3 inline mr-1" />Copy</>}
+                </button>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-900/40 border border-emerald-800">
-                <label className="block text-[11px] font-bold text-amber-300 mb-0.5">
-                  Children (बच्चे)
-                </label>
-                <span className="text-[10px] text-emerald-400 block mb-2">Below 12 years</span>
-                <div className="flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setKidsCount((prev) => Math.max(0, prev - 1))}
-                    className="w-7 h-7 rounded-lg bg-emerald-950 hover:bg-emerald-800 border border-emerald-700 text-amber-300 flex items-center justify-center font-bold text-sm"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-base font-bold font-mono text-white">{kidsCount}</span>
-                  <button
-                    type="button"
-                    onClick={() => setKidsCount((prev) => prev + 1)}
-                    className="w-7 h-7 rounded-lg bg-emerald-950 hover:bg-emerald-800 border border-emerald-700 text-amber-300 flex items-center justify-center font-bold text-sm"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+              {/* WhatsApp Share Button */}
+              <a
+                href={waShareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 w-full justify-center py-3 rounded-xl bg-[#25D366] hover:bg-[#1ebe5e] text-white font-bold text-sm shadow-md hover:scale-[1.02] transition-transform"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                Send RSVP Form to WhatsApp Group
+              </a>
             </div>
-
-            {/* Diet Preference Chips */}
-            <div>
-              <label className="block text-xs font-semibold text-emerald-200 mb-1.5">
-                Mahaprasad Catering Diet Preference
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'regular', label: 'Satvik Regular' },
-                  { id: 'jain', label: 'Pure Jain' },
-                  { id: 'falahar', label: 'Vrat Falahar' },
-                ].map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => setDietPreference(d.id as any)}
-                    className={`py-1.5 px-2 rounded-xl text-[11px] font-semibold transition-all border text-center truncate ${
-                      dietPreference === d.id
-                        ? 'bg-amber-500 text-emerald-950 border-amber-400 font-bold shadow-sm'
-                        : 'bg-emerald-900/40 text-emerald-200 border-emerald-700/60 hover:bg-emerald-800/40'
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Special Notes */}
-            <div>
-              <label className="block text-xs font-semibold text-emerald-200 mb-1">
-                Special Notes / Accessibility Requests
-              </label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Senior citizen seating required, wheelchair access..."
-                className="w-full px-3.5 py-2 rounded-xl bg-emerald-900/50 border border-emerald-700/80 text-amber-50 text-xs placeholder:text-emerald-500 focus:outline-none focus:border-amber-400"
-              />
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-emerald-950 font-bold text-xs flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(245,158,11,0.35)] transition-all cursor-pointer"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Confirm Attendance ({adultsCount + kidsCount} Family Members)</span>
-            </button>
-          </form>
+          </div>
         </div>
 
         {/* Right Column: Confirmed Attendance Cards (Live Community Roster) */}
+
         <div className="lg:col-span-6 bg-emerald-950/70 border border-emerald-800/80 rounded-3xl p-5 sm:p-7 shadow-lg backdrop-blur-sm flex flex-col h-full">
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-emerald-800/60">
             <div>
@@ -1056,7 +1056,7 @@ function RsvpRosterSection({ showToast }: { showToast: (m: string) => void }) {
             <div className="text-center py-12 text-emerald-300/60">
               <Users className="w-10 h-10 mx-auto mb-2 opacity-40" />
               <p className="text-xs">No RSVPs registered yet for this festival.</p>
-              <p className="text-[11px] text-emerald-400/60 mt-1">Use the form on the left to add attendees!</p>
+              <p className="text-[11px] text-emerald-400/60 mt-1">Share the RSVP form QR code with residents to start collecting responses!</p>
             </div>
           ) : (
             <div className="space-y-3 max-h-[460px] overflow-y-auto pr-1">
