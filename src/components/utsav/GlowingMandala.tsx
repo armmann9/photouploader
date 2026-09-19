@@ -15,7 +15,7 @@ export const GlowingMandala: React.FC<GlowingMandalaProps> = ({
 }) => {
   return (
     <div 
-      className={`relative flex items-center justify-center pointer-events-none select-none ${className}`}
+      className={`relative flex items-center justify-center pointer-events-none select-none max-w-[95vw] max-h-[95vw] ${className}`}
       style={{ width: size, height: size, opacity }}
       id="hero-glowing-mandala"
     >

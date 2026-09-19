@@ -37,7 +37,7 @@ export const ToranGarland: React.FC<ToranGarlandProps> = ({ interactive = true }
       <div className="relative w-full">
         <svg 
           viewBox="0 0 1440 120" 
-          className="w-full h-auto max-h-24 md:max-h-28 drop-shadow-[0_8px_16px_rgba(0,0,0,0.6)]"
+          className="w-full h-auto max-h-16 sm:max-h-24 md:max-h-28 drop-shadow-[0_8px_16px_rgba(0,0,0,0.6)]"
           preserveAspectRatio="none"
           fill="none"
         >

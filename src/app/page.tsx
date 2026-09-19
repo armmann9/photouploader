@@ -12,6 +12,8 @@ import {
   ArrowUpRight,
   ShieldCheck,
   UserCheck,
+  Menu,
+  X,
 } from 'lucide-react';
 
 import { FESTIVAL_EVENTS } from '@/data/festivalEvents';
@@ -43,6 +45,7 @@ export default function HomePage() {
   const [activePhoto, setActivePhoto] = useState<EventPhoto | null>(null);
   const [isAudioOn, setIsAudioOn] = useState<boolean>(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   // Live RSVP records — synced from localStorage so event card count updates in real-time
   const [rsvpList, setRsvpList] = useState<EventRsvpRecord[]>(INITIAL_RSVP_RECORDS);
 
@@ -198,8 +201,9 @@ export default function HomePage() {
       <PetalCanvas mode={particleMode} />
 
       {/* Top Floating Festive Navigation Bar */}
-      <nav className="fixed top-12 md:top-14 left-0 right-0 z-30 flex justify-center px-4 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-full bg-emerald-950/90 border border-amber-400/40 shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur-md">
+      <nav className="fixed top-8 sm:top-12 md:top-14 left-0 right-0 z-30 flex flex-col items-center px-3 sm:px-4 pointer-events-none">
+        {/* Desktop Navbar (md and up) */}
+        <div className="pointer-events-auto hidden md:flex items-center gap-2 p-2 rounded-full bg-emerald-950/95 border border-amber-400/40 shadow-[0_8px_30px_rgba(0,0,0,0.85)] backdrop-blur-md">
           <button
             onClick={() => scrollToSection('hero-section')}
             className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-400/20 hover:from-amber-500/30 hover:to-yellow-400/30 text-amber-300 font-extrabold text-xs flex items-center gap-1.5 border border-amber-400/40"
@@ -214,7 +218,7 @@ export default function HomePage() {
               className="px-2.5 py-1.5 rounded-full text-amber-300 font-semibold hover:bg-emerald-900/60 transition-colors flex items-center gap-1"
             >
               <Users className="w-3 h-3 text-amber-400" />
-              <span className="hidden sm:inline">About & Team</span>
+              <span>About & Team</span>
             </button>
             <button
               onClick={() => scrollToSection('face-match-portal')}
@@ -252,73 +256,195 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+
+        {/* Mobile Navbar (under md) - 100% responsive, never cut off */}
+        <div className="pointer-events-auto flex md:hidden items-center justify-between w-full max-w-sm px-3 py-1.5 rounded-full bg-emerald-950/95 border border-amber-400/40 shadow-[0_8px_30px_rgba(0,0,0,0.85)] backdrop-blur-md">
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              scrollToSection('hero-section');
+            }}
+            className="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-400/20 text-amber-300 font-extrabold text-xs flex items-center gap-1 border border-amber-400/40 shrink-0"
+          >
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            <span>बनी पार्क BPSCVS</span>
+          </button>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                scrollToSection('face-match-portal');
+              }}
+              className="px-2.5 py-1 rounded-full text-emerald-200 hover:text-amber-300 bg-emerald-900/70 border border-emerald-700/50 flex items-center gap-1 font-medium text-[11px]"
+            >
+              <Camera className="w-3 h-3 text-amber-400" />
+              <span>Face</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                scrollToSection('bpscvs-rsvp-counter-section');
+              }}
+              className="px-2 py-1 rounded-full text-amber-300 bg-emerald-900/70 border border-amber-400/30 font-semibold flex items-center gap-1 text-[11px]"
+            >
+              <UserCheck className="w-3 h-3 text-amber-400" />
+              <span>RSVP</span>
+            </button>
+
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 flex items-center gap-1 font-bold text-[11px]"
+              aria-label="Toggle Navigation Menu"
+            >
+              {mobileMenuOpen ? <X className="w-3.5 h-3.5" /> : <Menu className="w-3.5 h-3.5" />}
+              <span>{mobileMenuOpen ? 'बंद' : 'Menu'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown Menu Drawer */}
+        {mobileMenuOpen && (
+          <div className="pointer-events-auto mt-2 w-full max-w-sm p-3.5 rounded-2xl bg-emerald-950/98 border border-amber-400/50 shadow-[0_12px_40px_rgba(0,0,0,0.95)] backdrop-blur-xl animate-in fade-in slide-in-from-top-3 duration-200 flex flex-col gap-1 md:hidden">
+            <div className="text-[11px] text-amber-400/90 font-bold px-2 py-1 flex items-center justify-between border-b border-emerald-800/80 mb-1">
+              <span>🌸 जय झूलेलाल • BPSCVS Quick Menu</span>
+              <span className="text-[10px] text-emerald-300 font-normal">स्थापना 1970</span>
+            </div>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                scrollToSection('about-society-team-section');
+              }}
+              className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 hover:bg-emerald-900/80 flex items-center gap-2.5 transition-colors"
+            >
+              <Users className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>About Colony & Committee Team</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                scrollToSection('festival-albums-section');
+              }}
+              className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 hover:bg-emerald-900/80 flex items-center gap-2.5 transition-colors"
+            >
+              <Camera className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Society Festival Photo Albums</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                scrollToSection('festival-panchang-section');
+              }}
+              className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 hover:bg-emerald-900/80 flex items-center gap-2.5 transition-colors"
+            >
+              <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Colony Festival Panchang & Schedule</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                scrollToSection('bpscvs-rsvp-counter-section');
+              }}
+              className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 hover:bg-emerald-900/80 flex items-center gap-2.5 transition-colors"
+            >
+              <UserCheck className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Live Event RSVP Attendance</span>
+            </button>
+
+            <Link
+              href="/events"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-amber-200 hover:bg-emerald-900/80 flex items-center gap-2.5 transition-colors"
+            >
+              <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Browse All Events Archive</span>
+            </Link>
+
+            <Link
+              href="/login"
+              onClick={() => setMobileMenuOpen(false)}
+              className="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 flex items-center justify-between transition-colors mt-1"
+            >
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Executive & Staff Login</span>
+              </span>
+              <span className="text-[10px] bg-amber-400 text-emerald-950 px-2 py-0.5 rounded-full font-black">Portal →</span>
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Floating Audio & Celebration Action Dock */}
-      <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3">
+      <div className="fixed bottom-4 sm:bottom-6 right-3 sm:right-6 z-40 flex items-center gap-2 sm:gap-3">
         <button
           id="phool-barsao-btn"
           onClick={() => {
             playTempleBell(940);
             triggerPhoolBarsao();
           }}
-          className="px-4 py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-emerald-950 font-bold text-xs shadow-[0_4px_20px_rgba(245,158,11,0.4)] hover:from-amber-400 hover:to-yellow-300 transition-all active:scale-95 flex items-center gap-2 border border-amber-300"
+          className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-emerald-950 font-bold text-[11px] sm:text-xs shadow-[0_4px_20px_rgba(245,158,11,0.4)] hover:from-amber-400 hover:to-yellow-300 transition-all active:scale-95 flex items-center gap-1.5 sm:gap-2 border border-amber-300"
         >
-          <Sparkles className="w-4 h-4 text-emerald-950" />
-          <span>🌸 फूल बरसाओ (Shower Petals)</span>
+          <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-950" />
+          <span>🌸 फूल बरसाओ</span>
         </button>
 
         <button
           id="ambient-sound-toggle-btn"
           onClick={handleAudioToggle}
           title={isAudioOn ? 'Mute Festive Tanpura' : 'Play Festive Tanpura Sound'}
-          className={`p-3 rounded-full border transition-all shadow-lg ${
+          className={`p-2.5 sm:p-3 rounded-full border transition-all shadow-lg ${
             isAudioOn
               ? 'bg-amber-500 text-emerald-950 border-amber-300 shadow-[0_0_15px_#fbbf24]'
               : 'bg-emerald-950/80 text-amber-300 border-emerald-700 hover:bg-emerald-900'
           }`}
         >
-          {isAudioOn ? <Volume2 className="w-5 h-5 animate-pulse" /> : <VolumeX className="w-5 h-5" />}
+          {isAudioOn ? <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 animate-pulse" /> : <VolumeX className="w-4 h-4 sm:w-5 sm:h-5" />}
         </button>
       </div>
 
       {/* Main Content Area (Framed between left and right pillars) */}
-      <main className="relative z-20 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-12 pt-24 md:pt-32 pb-24">
+      <main className="relative z-20 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-12 pt-24 sm:pt-28 md:pt-32 pb-24">
         {/* HERO SECTION WITH ROTATING SACRED MANDALA */}
-        <section className="relative flex flex-col items-center text-center py-10 md:py-16 mb-16" id="hero-section">
+        <section className="relative flex flex-col items-center text-center py-6 sm:py-10 md:py-16 mb-16" id="hero-section">
           {/* Centered Glowing Rotating Sacred Mandala directly behind headline */}
           <div
-            className="absolute top-20 md:top-28 left-1/2 -z-10 transition-transform duration-300 ease-out pointer-events-none"
+            className="absolute top-16 md:top-28 left-1/2 -z-10 transition-transform duration-300 ease-out pointer-events-none"
             style={{
               transform: `translate(calc(-50% + ${mousePos.x * 12}px), ${mousePos.y * 12}px)`,
             }}
           >
             {mandalaIntensity !== 'off' && (
               <GlowingMandala
-                size={typeof window !== 'undefined' && window.innerWidth < 768 ? 380 : 580}
+                size={typeof window !== 'undefined' && window.innerWidth < 768 ? 320 : 580}
                 opacity={mandalaIntensity === 'soft' ? 0.85 : 0.5}
               />
             )}
           </div>
 
           {/* Colony / Society Identification Badge */}
-          <div className="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-emerald-900/80 border border-amber-400/40 text-amber-300 text-xs md:text-sm font-semibold mb-6 shadow-lg backdrop-blur-md">
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-            <span>🌸 जय झूलेलाल • BPSCVS जयपुर (स्थापना 1970)</span>
+          <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-1.5 sm:py-2 rounded-full bg-emerald-900/80 border border-amber-400/40 text-amber-300 text-xs sm:text-sm font-semibold mb-5 shadow-lg backdrop-blur-md max-w-full">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+            <span className="truncate">🌸 जय झूलेलाल • BPSCVS जयपुर (स्थापना 1970)</span>
           </div>
 
           {/* Royal Headline with Indian Typography */}
-          <h1 className="text-4xl sm:text-6xl md:text-7xl font-display tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-100 via-amber-300 to-yellow-400 drop-shadow-[0_4px_16px_rgba(0,0,0,0.85)] max-w-4xl mx-auto leading-tight md:leading-none mb-4">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-display tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-100 via-amber-300 to-yellow-400 drop-shadow-[0_4px_16px_rgba(0,0,0,0.85)] max-w-4xl mx-auto leading-tight mb-3">
             बनी पार्क सिंधी कॉलोनी
           </h1>
-          <p className="text-xl md:text-2xl font-serif text-amber-200 font-medium max-w-2xl mx-auto mb-2 tracking-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
+          <p className="text-lg sm:text-xl md:text-2xl font-serif text-amber-200 font-medium max-w-2xl mx-auto mb-2 tracking-normal drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">
             त्योहार, उत्सव एवं सांस्कृतिक स्मृतियों का डिजिटल संग्रह
           </p>
-          <p className="text-xs md:text-sm text-amber-300/80 font-medium tracking-wide uppercase max-w-2xl mx-auto mb-4">
+          <p className="text-[11px] sm:text-xs md:text-sm text-amber-300/80 font-medium tracking-wide uppercase max-w-2xl mx-auto mb-4">
             Festival Celebrations, Community Memories & AI Photo Portal
           </p>
 
-          <p className="text-emerald-200/90 text-sm md:text-base max-w-2xl mx-auto leading-relaxed mb-6 drop-shadow-sm">
+          <p className="text-emerald-200/90 text-xs sm:text-sm md:text-base max-w-2xl mx-auto leading-relaxed mb-6 drop-shadow-sm px-2">
             Official digital community portal for our colony residents: Explore festival photo albums, register family attendance for celebrations, and preserve our shared heritage.
           </p>
 
