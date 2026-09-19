@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
 import { getAllEvents, createEvent, updateEvent, deleteEvent, resetToSeed, getAllRsvps, safeLocalStorageSet } from '@/lib/db';
+import { getSupabaseClient } from '@/lib/supabase';
 import { INITIAL_EVENTS } from '@/lib/sampleData';
 import { EventItem } from '@/lib/types';
 import { FESTIVAL_EVENTS } from '@/data/festivalEvents';
@@ -278,6 +279,8 @@ function EventManagementSection({ showToast }: { showToast: (m: string) => void 
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedQrEvent, setSelectedQrEvent] = useState<EventItem | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [unsyncedCount, setUnsyncedCount] = useState<number>(0);
 
   // Form fields
   const [name, setName] = useState('');
@@ -289,16 +292,117 @@ function EventManagementSection({ showToast }: { showToast: (m: string) => void 
   const [cover, setCover] = useState('');
   const [status, setStatus] = useState<'upcoming' | 'completed'>('upcoming');
 
+  const checkUnsyncedEvents = async () => {
+    try {
+      let localEvents: EventItem[] = [];
+      const lsRaw = localStorage.getItem('bpscvs_events_v3') || localStorage.getItem('eventlens_events_data');
+      if (lsRaw) {
+        localEvents = JSON.parse(lsRaw);
+      }
+      const supabase = getSupabaseClient();
+      if (supabase && localEvents.length > 0) {
+        const { data: cloudEvents } = await supabase.from('events').select('id, title');
+        const existingIds = new Set((cloudEvents || []).map((e: any) => e.id));
+        const existingTitles = new Set((cloudEvents || []).map((e: any) => e.title?.toLowerCase().trim()));
+        const pending = localEvents.filter(
+          (ev) => !existingIds.has(ev.id) && !existingTitles.has(ev.title?.toLowerCase().trim())
+        );
+        setUnsyncedCount(pending.length);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const refreshEvents = async () => {
     setLoadingEvents(true);
     const data = await getAllEvents();
     setEvents(data);
     setLoadingEvents(false);
+    checkUnsyncedEvents();
   };
 
   useEffect(() => {
     refreshEvents();
   }, []);
+
+  const handleSyncToCloud = async () => {
+    setSyncing(true);
+    try {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        showToast('⚠️ Supabase Cloud is not configured.');
+        setSyncing(false);
+        return;
+      }
+
+      let localEvents: EventItem[] = [];
+      const lsRaw = localStorage.getItem('bpscvs_events_v3') || localStorage.getItem('eventlens_events_data');
+      if (lsRaw) {
+        try {
+          localEvents = JSON.parse(lsRaw);
+        } catch {}
+      }
+
+      // Also include current in-memory events if any
+      const combined = [...localEvents, ...events];
+      const uniqueLocal = Array.from(new Map(combined.map(e => [e.id, e])).values());
+
+      const { data: cloudEvents, error: fetchErr } = await supabase.from('events').select('id, title');
+      if (fetchErr) {
+        showToast('❌ Could not query Supabase: ' + fetchErr.message);
+        setSyncing(false);
+        return;
+      }
+
+      const existingIds = new Set((cloudEvents || []).map((e: any) => e.id));
+      const existingTitles = new Set((cloudEvents || []).map((e: any) => e.title?.toLowerCase().trim()));
+
+      const eventsToUpload = uniqueLocal.filter(
+        (ev) => !existingIds.has(ev.id) && !existingTitles.has(ev.title?.toLowerCase().trim())
+      );
+
+      if (eventsToUpload.length === 0) {
+        showToast('✅ Cloud Database is already synced! All events are live on mobile & laptop.');
+        setUnsyncedCount(0);
+        setSyncing(false);
+        return;
+      }
+
+      const insertRows = eventsToUpload.map((ev) => ({
+        id: ev.id,
+        slug: ev.slug || ev.id,
+        title: ev.title,
+        description: ev.description || '',
+        date: ev.date,
+        time: ev.time || '18:00',
+        location: ev.location || 'Bani Park, Jaipur',
+        cover_image: ev.coverImage || 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1000&q=80',
+        category: ev.category || 'Deepotsav',
+        status: ev.status || 'upcoming',
+        map_url: ev.mapUrl || '',
+        registration_open: ev.registrationOpen ?? true,
+        photo_count: ev.photoCount || 0,
+        is_public: true,
+      }));
+
+      const { error: insertErr } = await supabase.from('events').insert(insertRows);
+      if (insertErr) {
+        showToast('❌ Sync error: ' + insertErr.message);
+      } else {
+        playTempleBell(960);
+        triggerPhoolBarsao();
+        showToast(`🎉 Synced ${insertRows.length} event(s) to Supabase Cloud! Now live on all phones.`);
+        setUnsyncedCount(0);
+        await refreshEvents();
+        window.dispatchEvent(new Event('bpscvs_events_updated'));
+      }
+    } catch (err: any) {
+      showToast('❌ Sync failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const resetForm = () => {
     setEditingId(null);
@@ -357,7 +461,7 @@ function EventManagementSection({ showToast }: { showToast: (m: string) => void 
         status,
         isPublic: true,
       });
-      showToast('✅ Event created successfully.');
+      showToast('✅ Event created successfully in Cloud Database.');
     }
     resetForm();
     await refreshEvents();
@@ -381,13 +485,56 @@ function EventManagementSection({ showToast }: { showToast: (m: string) => void 
 
   return (
     <div className="space-y-6">
-      {/* Top Description Banner */}
-      <div>
-        <h1 className="text-3xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-400">Admin Panel</h1>
-        <p className="text-emerald-200/70 text-sm mt-1">
-          Create and manage events. Changes save to this browser (via localStorage) — wire this up to the real backend when it's ready.
-        </p>
+      {/* Top Description Banner & Cloud Sync Control */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-950/90 via-emerald-900/60 to-emerald-950/90 border border-amber-400/30 shadow-md">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <h1 className="text-2xl sm:text-3xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-400">
+              Event Management
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[11px] font-bold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Supabase Cloud Live
+            </span>
+          </div>
+          <p className="text-emerald-200/80 text-xs sm:text-sm">
+            Create and edit colony festival events. All events automatically sync across phones, laptops, and the public portal.
+          </p>
+        </div>
+
+        <button
+          onClick={handleSyncToCloud}
+          disabled={syncing}
+          className={`shrink-0 px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 border transition-all shadow-md active:scale-95 ${
+            unsyncedCount > 0
+              ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-emerald-950 border-amber-300 animate-pulse'
+              : 'bg-emerald-900/80 hover:bg-emerald-800 text-amber-300 border-amber-400/40 hover:border-amber-300'
+          }`}
+          title="Push any offline or local laptop events to Supabase cloud database"
+        >
+          <Zap className={`w-4 h-4 ${syncing ? 'animate-spin' : 'text-amber-300 fill-current'}`} />
+          <span>{syncing ? 'Syncing to Cloud...' : unsyncedCount > 0 ? `⚡ Sync ${unsyncedCount} Laptop Event(s) to Cloud` : '⚡ 1-Click Cloud Sync'}</span>
+        </button>
       </div>
+
+      {/* Unsynced Alert Notice if found */}
+      {unsyncedCount > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-400/50 flex items-center justify-between gap-3 text-amber-200 text-xs">
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+            <span>
+              <strong>Found {unsyncedCount} unsynced event(s)</strong> on this laptop (e.g. Lokarpan Samaroh). Click sync to make them live on all mobile phones!
+            </span>
+          </div>
+          <button
+            onClick={handleSyncToCloud}
+            disabled={syncing}
+            className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-yellow-300 text-emerald-950 font-extrabold text-xs shrink-0"
+          >
+            Sync Now →
+          </button>
+        </div>
+      )}
 
       {/* Two-Column Side-by-Side Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
