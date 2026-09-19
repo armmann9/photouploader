@@ -156,38 +156,54 @@ DROP POLICY IF EXISTS "Allow public insert on photos"  ON public.photos;
 DROP POLICY IF EXISTS "Allow public update on photos"  ON public.photos;
 
 -- ── events ──────────────────────────────────────────────
+DROP POLICY IF EXISTS "events_admin_insert" ON public.events;
+DROP POLICY IF EXISTS "events_admin_update" ON public.events;
+DROP POLICY IF EXISTS "events_admin_delete" ON public.events;
+DROP POLICY IF EXISTS "events_public_select" ON public.events;
+DROP POLICY IF EXISTS "events_public_insert" ON public.events;
+DROP POLICY IF EXISTS "events_public_update" ON public.events;
+DROP POLICY IF EXISTS "events_public_delete" ON public.events;
+
 CREATE POLICY "events_public_select"
   ON public.events FOR SELECT
-  USING (is_public = true OR auth.role() = 'authenticated');
+  USING (true);
 
-CREATE POLICY "events_admin_insert"
+CREATE POLICY "events_public_insert"
   ON public.events FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated');
+  WITH CHECK (true);
 
-CREATE POLICY "events_admin_update"
+CREATE POLICY "events_public_update"
   ON public.events FOR UPDATE
-  USING (auth.role() = 'authenticated');
+  USING (true);
 
-CREATE POLICY "events_admin_delete"
+CREATE POLICY "events_public_delete"
   ON public.events FOR DELETE
-  USING (auth.role() = 'authenticated');
+  USING (true);
 
 -- ── photos ──────────────────────────────────────────────
+DROP POLICY IF EXISTS "photos_admin_insert" ON public.photos;
+DROP POLICY IF EXISTS "photos_admin_update" ON public.photos;
+DROP POLICY IF EXISTS "photos_admin_delete" ON public.photos;
+DROP POLICY IF EXISTS "photos_public_select" ON public.photos;
+DROP POLICY IF EXISTS "photos_public_insert" ON public.photos;
+DROP POLICY IF EXISTS "photos_public_update" ON public.photos;
+DROP POLICY IF EXISTS "photos_public_delete" ON public.photos;
+
 CREATE POLICY "photos_public_select"
   ON public.photos FOR SELECT
   USING (true);
 
-CREATE POLICY "photos_admin_insert"
+CREATE POLICY "photos_public_insert"
   ON public.photos FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated');
+  WITH CHECK (true);
 
-CREATE POLICY "photos_admin_update"
+CREATE POLICY "photos_public_update"
   ON public.photos FOR UPDATE
-  USING (auth.role() = 'authenticated');
+  USING (true);
 
-CREATE POLICY "photos_admin_delete"
+CREATE POLICY "photos_public_delete"
   ON public.photos FOR DELETE
-  USING (auth.role() = 'authenticated');
+  USING (true);
 
 -- ── rsvps ───────────────────────────────────────────────
 CREATE POLICY "rsvps_public_insert"
