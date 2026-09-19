@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { UploadCloud, Image as ImageIcon, Sparkles, CheckCircle2, AlertCircle, RefreshCw, X, FolderPlus } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { UploadCloud, Image as ImageIcon, Sparkles, CheckCircle2, AlertCircle, RefreshCw, X, FolderPlus, Zap, Database } from 'lucide-react';
 import { PhotoItem } from '@/lib/types';
-import { savePhotos, updatePhotoFaces } from '@/lib/db';
-import { uploadPhotoToCloud, isCloudConfigured } from '@/lib/supabase';
+import { savePhotos } from '@/lib/db';
+import { uploadPhoto, getStorageStatus, StorageStatus } from '@/lib/storage';
 import { detectFacesAndExtractEmbeddings, createImageElementFromBlob } from '@/lib/faceRecognition';
 
 interface BulkUploaderProps {
@@ -28,7 +28,18 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
   const [currentTag, setCurrentTag] = useState('Highlights');
   const [overallProgress, setOverallProgress] = useState(0);
   const [sessionOnlyWarning, setSessionOnlyWarning] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<StorageStatus>({
+    r2Configured: false,
+    supabaseConfigured: false,
+    activeProvider: 'session',
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getStorageStatus().then((status) => {
+      setStorageInfo(status);
+    });
+  }, []);
 
   const handleFileSelection = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -53,7 +64,6 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
     if (queue.length === 0 || isUploading) return;
     setIsUploading(true);
 
-    const isCloud = isCloudConfigured();
     const batchSize = 3; // Process 3 images in parallel for smooth performance
     const newPhotosToSave: PhotoItem[] = [];
     let completedCount = 0;
@@ -70,24 +80,14 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
           let photoUrl: string;
           let thumbnailUrl: string;
 
-          // 1. Cloud Storage Upload (preferred — persistent CDN URL)
-          if (isCloud) {
-            const uploadRes = await uploadPhotoToCloud(item.file, item.file.name, eventId);
-            if (uploadRes.publicUrl) {
-              photoUrl = uploadRes.publicUrl;
-              thumbnailUrl = uploadRes.publicUrl;
-            } else {
-              // Cloud upload attempt failed — use blob URL for this session only.
-              // Do NOT convert to base64: a 1-3MB base64 string per photo would
-              // immediately blow the 5MB localStorage quota for bulk uploads.
-              photoUrl = item.previewUrl;
-              thumbnailUrl = item.previewUrl;
-              anySessionOnly = true;
-            }
+          // 1. Storage Upload (Cloudflare R2 preferred -> Supabase -> Session Fallback)
+          const uploadRes = await uploadPhoto(item.file, item.file.name, eventId);
+
+          if (uploadRes.publicUrl) {
+            photoUrl = uploadRes.publicUrl;
+            thumbnailUrl = uploadRes.publicUrl;
           } else {
-            // No cloud configured — session-only blob URL for this tab.
-            // Do NOT convert to base64: would blow localStorage quota.
-            // Admin must configure Supabase for cross-session persistence.
+            // Cloud upload attempt failed / no cloud provider — use blob URL for this session.
             photoUrl = item.previewUrl;
             thumbnailUrl = item.previewUrl;
             anySessionOnly = true;
@@ -110,8 +110,6 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
           }
 
           updateQueueItemStatus(item.id, 'completed', 100, faceDescriptors?.length);
-          // NOTE: do NOT revokeObjectURL here — when session-only, the blob URL
-          // IS the stored photo URL and must remain valid while the tab is open.
 
           const newPhoto: PhotoItem = {
             id: `photo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -132,13 +130,12 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
       );
     }
 
-    // Save metadata to database (safeLocalStorageSet in db.ts guards against quota crashes)
+    // Save metadata to database
     await savePhotos(newPhotosToSave);
     setIsUploading(false);
     if (anySessionOnly) setSessionOnlyWarning(true);
     onUploadComplete(newPhotosToSave.length);
   };
-
 
   const updateQueueItemStatus = (
     id: string,
@@ -168,11 +165,29 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h3 className="text-xl font-display font-bold text-amber-200">
-            Bulk Photo Uploader (200+ Photos)
-          </h3>
-          <p className="text-xs text-emerald-300/70 mt-0.5">
-            Upload high-resolution event photos. AI will automatically index facial features for guest search.
+          <div className="flex items-center gap-2.5 flex-wrap mb-1">
+            <h3 className="text-xl font-display font-bold text-amber-200">
+              Bulk Photo Uploader (200+ Photos)
+            </h3>
+            {/* Storage Provider Status Badge */}
+            {storageInfo.activeProvider === 'r2' ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40 shadow-sm">
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                Cloudflare R2 Storage (Active)
+              </span>
+            ) : storageInfo.activeProvider === 'supabase' ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                Supabase Storage (Active)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-medium bg-emerald-900/60 text-emerald-300/80 border border-emerald-700/50">
+                Session Mode (Local)
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-emerald-300/70">
+            Upload high-resolution event photos. AI automatically indexes facial features for resident search.
           </p>
         </div>
 
@@ -201,7 +216,7 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
               Photos are stored in memory for this browser session. To protect against the browser's 5MB local storage quota limit, full image data is not saved to localStorage.
             </p>
             <p className="text-amber-400/80">
-              To persist photos across refreshes and devices, configure <code className="bg-emerald-950 px-1 py-0.5 rounded text-amber-200">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="bg-emerald-950 px-1 py-0.5 rounded text-amber-200">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in your environment.
+              To persist photos across refreshes and devices, configure <strong className="text-amber-200">Cloudflare R2</strong> (<code className="bg-emerald-950 px-1 py-0.5 rounded text-amber-200">R2_ACCOUNT_ID</code>, <code className="bg-emerald-950 px-1 py-0.5 rounded text-amber-200">R2_BUCKET_NAME</code>) or Supabase in your environment variables.
             </p>
           </div>
         </div>
@@ -283,7 +298,7 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
           {isUploading && (
             <div className="space-y-1.5">
               <div className="flex justify-between text-xs font-semibold text-emerald-300">
-                <span>Uploading to Cloud & AI Facial Vector Embedding</span>
+                <span>Uploading to {storageInfo.activeProvider === 'r2' ? 'Cloudflare R2' : storageInfo.activeProvider === 'supabase' ? 'Supabase Cloud' : 'Storage'} & Indexing Face Vectors</span>
                 <span className="text-amber-400">{overallProgress}%</span>
               </div>
               <div className="h-2.5 bg-emerald-950 rounded-full overflow-hidden border border-emerald-800">
@@ -318,8 +333,8 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
                     <div className="text-center">
                       <CheckCircle2 className="w-5 h-5 text-emerald-400 mx-auto" />
                       {item.facesCount !== undefined && (
-                        <div className="text-[10px] text-amber-200 mt-0.5">
-                          {item.facesCount} faces
+                        <div className="text-[10px] text-amber-200 mt-0.5 font-semibold">
+                          {item.facesCount} {item.facesCount === 1 ? 'face' : 'faces'}
                         </div>
                       )}
                     </div>
@@ -332,7 +347,7 @@ export default function BulkUploader({ eventId, onUploadComplete }: BulkUploader
                   {item.status === 'indexing_faces' && (
                     <div className="text-center">
                       <Sparkles className="w-5 h-5 text-purple-400 animate-pulse mx-auto" />
-                      <div className="text-[9px] text-purple-200">AI Indexing</div>
+                      <div className="text-[9px] text-purple-200 font-semibold">AI Indexing</div>
                     </div>
                   )}
 

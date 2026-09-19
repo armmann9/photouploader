@@ -18,6 +18,7 @@ import { FESTIVAL_EVENTS } from '@/data/festivalEvents';
 import { FestivalEvent, EventPhoto, FestiveTheme, EventRsvpRecord } from '@/types/utsav';
 import { getMergedFestivalEvents } from '@/lib/db';
 import { INITIAL_RSVP_RECORDS } from '@/data/bpscvsData';
+import HomeFaceFinder from '@/components/HomeFaceFinder';
 
 import {
   ToranGarland,
@@ -356,6 +357,9 @@ export default function HomePage() {
             </button>
           </div>
         </section>
+
+        {/* AI BIOMETRIC FACE FINDER PORTAL */}
+        <HomeFaceFinder events={eventsList} />
 
         {/* 3D TILT EVENT CARDS GRID */}
         <section className="mb-20" id="festival-albums-section">

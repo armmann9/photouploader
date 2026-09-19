@@ -3,46 +3,38 @@
  * EventLens AI — Face Recognition Neural Network Engine (faceRecognition.ts)
  * ============================================================================
  *
- * PURPOSE:
- *   Powers the core AI "Find My Photos" face recognition experience using
- *   state-of-the-art deep learning neural networks directly in the browser.
- *   Runs 100% client-side via WebGL with $0 server GPU costs.
+ * State-of-the-art deep learning biometric neural network pipeline:
+ * - SSD MobileNet v1 & Tiny Face Detector
+ * - 68-Point Facial Landmark Net
+ * - ResNet-34 128-Dimensional Biometric Embedding Vector Extractor
  *
- * NEURAL NETWORK PIPELINE:
- *   ┌────────────────────────────────────────────────────────────────┐
- *   │  Step 1: SSD MobileNet v1 (Face Detector)                     │
- *   │    → High accuracy face detection & bounding box localization  │
- *   │                                                                │
- *   │  Step 2: Face Landmark 68-Point Net                           │
- *   │    → Normalizes facial rotation & alignment (eyes, nose, jaw)  │
- *   │                                                                │
- *   │  Step 3: Face Recognition Net (128-d Feature Embedding)        │
- *   │    → Extracts normalized 128-d biometric facial fingerprint    │
- *   │    → Compared with Euclidean Distance & Cosine Similarity      │
- *   │    → High-precision threshold: Distance <= 0.46 & Cosine >= 0.89│
- *   └────────────────────────────────────────────────────────────────┘
- * ============================================================================
+ * Runs 100% client-side via WebGL with zero server GPU latency and privacy-first design.
  */
 
 let faceapi: any = null;
 let modelsLoaded = false;
 let modelLoadingPromise: Promise<boolean> | null = null;
 
-/** Primary local model path (instant load from public folder) */
 const LOCAL_MODEL_URL = '/models';
-/** Secondary CDN fallback */
 const CDN_MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
 
 /**
- * Strict high-precision biometric matching thresholds.
- * In ResNet-34 128-d embeddings:
- *   d <= 0.35  -> near identical photo / very high confidence (95%+)
- *   d <= 0.46  -> same individual under varying light/pose (85%-95%)
- *   d > 0.46   -> different individual (filtered out, 0 false positives)
+ * Calibrated match thresholds for 128-d ResNet face embeddings
  */
-export const FACE_MATCH_DISTANCE_THRESHOLD = 0.46; // Strict Euclidean distance threshold
-export const FACE_MATCH_COSINE_THRESHOLD = 0.89;   // Strict Cosine similarity threshold
+export type MatchSensitivity = 'strict' | 'balanced' | 'relaxed';
 
+export const SENSITIVITY_THRESHOLDS: Record<MatchSensitivity, { distance: number; cosine: number }> = {
+  strict: { distance: 0.48, cosine: 0.86 },
+  balanced: { distance: 0.58, cosine: 0.78 }, // Recommended default for real-world lighting/glasses
+  relaxed: { distance: 0.65, cosine: 0.70 },
+};
+
+export const DEFAULT_DISTANCE_THRESHOLD = SENSITIVITY_THRESHOLDS.balanced.distance;
+export const DEFAULT_COSINE_THRESHOLD = SENSITIVITY_THRESHOLDS.balanced.cosine;
+
+/**
+ * Load Face API neural network models from local static assets or fallback CDN
+ */
 export async function loadFaceApiModels(): Promise<boolean> {
   if (modelsLoaded) return true;
   if (modelLoadingPromise) return modelLoadingPromise;
@@ -53,12 +45,13 @@ export async function loadFaceApiModels(): Promise<boolean> {
 
       faceapi = await import('@vladmandic/face-api');
 
-      // Try loading from local public/models directory first
+      // 1. Try local models folder first (instant & offline capable)
       try {
         await Promise.all([
           faceapi.nets.ssdMobilenetv1.loadFromUri(LOCAL_MODEL_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(LOCAL_MODEL_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(LOCAL_MODEL_URL),
+          faceapi.nets.tinyFaceDetector.loadFromUri(LOCAL_MODEL_URL).catch(() => {}),
         ]);
         modelsLoaded = true;
         console.log('⚡ [EventLens AI] Neural networks loaded from local models directory.');
@@ -67,11 +60,12 @@ export async function loadFaceApiModels(): Promise<boolean> {
         console.warn('⚠️ [EventLens AI] Local model load failed, falling back to CDN...', localErr);
       }
 
-      // Fallback to CDN
+      // 2. Fallback to CDN
       await Promise.all([
         faceapi.nets.ssdMobilenetv1.loadFromUri(CDN_MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(CDN_MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(CDN_MODEL_URL),
+        faceapi.nets.tinyFaceDetector.loadFromUri(CDN_MODEL_URL).catch(() => {}),
       ]);
 
       modelsLoaded = true;
@@ -94,8 +88,38 @@ export interface DetectedFaceDescriptor {
 }
 
 /**
- * Detect all faces in an image and extract 128-d facial embedding vectors.
- * Filters out tiny background noise faces below 35px for reliable landmarks.
+ * Resize canvas/image to optimal processing size to prevent WebGL memory spikes
+ */
+function getResizedCanvas(input: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement, maxDim = 1280): HTMLCanvasElement {
+  const width = 'videoWidth' in input ? input.videoWidth : input.width;
+  const height = 'videoHeight' in input ? input.videoHeight : input.height;
+
+  if (width <= maxDim && height <= maxDim) {
+    if (input instanceof HTMLCanvasElement) return input;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.drawImage(input, 0, 0);
+    return canvas;
+  }
+
+  const scale = Math.min(maxDim / width, maxDim / height);
+  const targetW = Math.round(width * scale);
+  const targetH = Math.round(height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.drawImage(input, 0, 0, targetW, targetH);
+  }
+  return canvas;
+}
+
+/**
+ * Detect all faces in an image and extract 128-d facial embedding vectors
  */
 export async function detectFacesAndExtractEmbeddings(
   input: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement
@@ -104,15 +128,26 @@ export async function detectFacesAndExtractEmbeddings(
   if (!isLoaded || !faceapi) return [];
 
   try {
-    const detections = await faceapi
-      .detectAllFaces(input, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 }))
+    const canvas = getResizedCanvas(input, 1400);
+
+    // Primary: SSD MobileNet with broad sensitivity
+    let detections = await faceapi
+      .detectAllFaces(canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }))
       .withFaceLandmarks()
       .withFaceDescriptors();
+
+    // Fallback: TinyFaceDetector if SSD MobileNet found 0 faces
+    if ((!detections || detections.length === 0) && faceapi.nets.tinyFaceDetector.isLoaded) {
+      detections = await faceapi
+        .detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.20 }))
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+    }
 
     if (!detections || detections.length === 0) return [];
 
     return detections
-      .filter((d: any) => d.detection.box.width >= 35 && d.detection.box.height >= 35)
+      .filter((d: any) => d.detection.box.width >= 24 && d.detection.box.height >= 24)
       .map((d: any) => ({
         box: {
           x: Math.round(d.detection.box.x),
@@ -124,7 +159,7 @@ export async function detectFacesAndExtractEmbeddings(
         confidence: d.detection.score,
       }));
   } catch (e) {
-    console.warn('Face detection processing error:', e);
+    console.warn('Face detection processing warning:', e);
     return [];
   }
 }
@@ -139,14 +174,25 @@ export async function extractSelfieDescriptor(
   if (!isLoaded || !faceapi) return null;
 
   try {
-    const detections = await faceapi
-      .detectAllFaces(input, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 }))
+    const canvas = getResizedCanvas(input, 1280);
+
+    // Primary: SSD MobileNet v1
+    let detections = await faceapi
+      .detectAllFaces(canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.22 }))
       .withFaceLandmarks()
       .withFaceDescriptors();
 
+    // Secondary fallback: TinyFaceDetector
+    if ((!detections || detections.length === 0) && faceapi.nets.tinyFaceDetector.isLoaded) {
+      detections = await faceapi
+        .detectAllFaces(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.18 }))
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+    }
+
     if (!detections || detections.length === 0) return null;
 
-    // Sort by face bounding box area (largest first)
+    // Pick largest face by bounding box area
     detections.sort((a: any, b: any) => {
       const areaA = a.detection.box.width * a.detection.box.height;
       const areaB = b.detection.box.width * b.detection.box.height;
@@ -165,7 +211,7 @@ export async function extractSelfieDescriptor(
       confidence: primaryFace.detection.score,
     };
   } catch (e) {
-    console.warn('Selfie face extraction error:', e);
+    console.warn('Selfie face extraction warning:', e);
     return null;
   }
 }
@@ -186,7 +232,6 @@ export function calculateEuclideanDistance(vecA: number[], vecB: number[]): numb
 
 /**
  * Compute Cosine Similarity between two 128-d face descriptor vectors
- * Returns a score between 0.0 and 1.0 (1.0 = identical vectors)
  */
 export function calculateCosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!vecA || !vecB || vecA.length !== vecB.length || vecA.length === 0) return 0;
@@ -207,10 +252,13 @@ export function calculateCosineSimilarity(vecA: number[], vecB: number[]): numbe
 }
 
 /**
- * High-precision biometric match evaluator with calibrated confidence scoring.
- * Enforces BOTH distance <= 0.46 AND cosine >= 0.89 to prevent false positives.
+ * Calibrated biometric match evaluator supporting sensitivity presets
  */
-export function evaluateFaceMatch(vecA: number[], vecB: number[]): {
+export function evaluateFaceMatch(
+  vecA: number[],
+  vecB: number[],
+  sensitivity: MatchSensitivity = 'balanced'
+): {
   isMatch: boolean;
   similarityScore: number;
   distance: number;
@@ -219,20 +267,28 @@ export function evaluateFaceMatch(vecA: number[], vecB: number[]): {
   const distance = calculateEuclideanDistance(vecA, vecB);
   const cosine = calculateCosineSimilarity(vecA, vecB);
 
-  // High precision match condition: distance <= 0.46 AND cosine >= 0.89
-  const isMatch = distance <= FACE_MATCH_DISTANCE_THRESHOLD && cosine >= FACE_MATCH_COSINE_THRESHOLD;
+  const threshold = SENSITIVITY_THRESHOLDS[sensitivity] || SENSITIVITY_THRESHOLDS.balanced;
 
+  // Calibrated biometric match condition
+  const isMatch = distance <= threshold.distance && cosine >= threshold.cosine;
+
+  // Calculate percentage similarity score (0.0 to 1.0)
   let similarityScore = 0;
-  if (isMatch) {
-    // Calibrated score for real matches:
-    // Distance 0.15 -> 97%
-    // Distance 0.30 -> 93%
-    // Distance 0.40 -> 89%
-    // Distance 0.46 -> 85%
-    similarityScore = Math.max(0.85, Math.min(0.99, 1 - (distance * 0.28)));
+  if (distance <= 0.20) {
+    similarityScore = 0.98 + (0.20 - distance) * 0.05; // 98% - 99%
+  } else if (distance <= 0.35) {
+    similarityScore = 0.93 + (0.35 - distance) * 0.33; // 93% - 98%
+  } else if (distance <= 0.48) {
+    similarityScore = 0.86 + (0.48 - distance) * 0.53; // 86% - 93%
+  } else if (distance <= 0.58) {
+    similarityScore = 0.77 + (0.58 - distance) * 0.90; // 77% - 86%
+  } else if (distance <= 0.65) {
+    similarityScore = 0.68 + (0.65 - distance) * 1.28; // 68% - 77%
   } else {
-    similarityScore = Math.max(0, 1 - (distance / 1.0));
+    similarityScore = Math.max(0.1, 1 - distance / 1.0);
   }
+
+  similarityScore = Math.max(0.01, Math.min(0.99, similarityScore));
 
   return {
     isMatch,
@@ -242,18 +298,12 @@ export function evaluateFaceMatch(vecA: number[], vecB: number[]): {
   };
 }
 
-/**
- * Backwards compatible match score helper
- */
 export function calculateEuclideanMatchScore(vecA: number[], vecB: number[]): number {
   return evaluateFaceMatch(vecA, vecB).similarityScore;
 }
 
 /**
- * Helper to generate HTMLImageElement from File or Blob.
- *
- * The object URL is revoked immediately after the image loads (or fails)
- * to prevent memory leaks during bulk photo processing sessions.
+ * Generate HTMLImageElement with CORS safety and memory cleanup
  */
 export function createImageElementFromBlob(blob: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -262,15 +312,36 @@ export function createImageElementFromBlob(blob: Blob): Promise<HTMLImageElement
     const objectUrl = URL.createObjectURL(blob);
 
     img.onload = () => {
-      URL.revokeObjectURL(objectUrl); // Free the Blob from browser memory
+      URL.revokeObjectURL(objectUrl);
       resolve(img);
     };
 
     img.onerror = (e) => {
-      URL.revokeObjectURL(objectUrl); // Free even on failure
+      URL.revokeObjectURL(objectUrl);
       reject(e);
     };
 
     img.src = objectUrl;
+  });
+}
+
+/**
+ * Load remote image safely with fallback for CORS-restricted hosts
+ */
+export function loadSafeImage(url: string): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      // Try again without crossOrigin
+      const retryImg = new Image();
+      retryImg.onload = () => resolve(retryImg);
+      retryImg.onerror = () => resolve(null);
+      retryImg.src = url;
+    };
+
+    img.src = url;
   });
 }

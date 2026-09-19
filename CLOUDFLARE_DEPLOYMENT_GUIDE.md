@@ -43,6 +43,11 @@ In **Cloudflare Dashboard** → **Workers & Pages** → **Your Project** → **S
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://YOUR_PROJECT_ID.supabase.co` | ✅ Yes |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJhbGciOi...` (from Supabase Dashboard → Settings → API) | ✅ Yes |
 | `AUTH_SECRET` | Any random 32+ character string (e.g., generate at https://generate-secret.vercel.app/32) | ✅ Yes |
+| `R2_ACCOUNT_ID` | Your Cloudflare Account ID (from Cloudflare Dashboard URL or Overview) | ⚡ Recommended for Photos |
+| `R2_ACCESS_KEY_ID` | S3 API Access Key ID (from R2 → Manage R2 API Tokens) | ⚡ Recommended for Photos |
+| `R2_SECRET_ACCESS_KEY` | S3 API Secret Access Key (from R2 → Manage R2 API Tokens) | ⚡ Recommended for Photos |
+| `R2_BUCKET_NAME` | Name of your R2 bucket (e.g. `bpscvs-photos`) | ⚡ Recommended for Photos |
+| `R2_PUBLIC_URL` | Public bucket URL (e.g. `https://pub-xxx.r2.dev` or custom domain `https://media.bpscvs.org`) | ⚡ Recommended for Photos |
 | `ADMIN_EMAIL` | `admin@bpscvs.org` (or your preferred admin email) | Optional |
 | `ADMIN_PASSWORD` | A strong password of your choice | Optional |
 | `PHOTOGRAPHER_EMAIL` | `lens.rohan@bpscvs.org` (or your photographer's email) | Optional |
@@ -52,7 +57,27 @@ In **Cloudflare Dashboard** → **Workers & Pages** → **Your Project** → **S
 
 ---
 
-## Step 4: Connect Your Custom Domain
+## Step 4: Set Up Cloudflare R2 Object Storage (Recommended for High-Res Photos)
+
+Cloudflare R2 provides 10GB free monthly storage and **$0 egress fees** (bandwidth is completely free), making it ideal for event photo galleries and AI face indexing.
+
+1. In Cloudflare Dashboard, navigate to **R2** → **Create bucket**.
+2. Name your bucket (e.g., `bpscvs-photos`) and choose **Automatic** location.
+3. Open your bucket → **Settings** tab:
+   - Under **Public Access**, click **Connect Domain** (e.g. `media.bpscvs.org`) OR click **Allow Access** on the `r2.dev` subdomain.
+   - Note down this public URL for `R2_PUBLIC_URL`.
+4. Go to **R2** → **Manage R2 API Tokens** → **Create API Token**:
+   - Token Name: `BPSCVS-Upload-Token`
+   - Permissions: **Object Read & Write**
+   - Apply to: Specify your bucket or all buckets
+   - Click **Create API Token**
+5. Copy the **Access Key ID** (`R2_ACCESS_KEY_ID`) and **Secret Access Key** (`R2_SECRET_ACCESS_KEY`).
+6. Copy your **Account ID** from the right sidebar of the R2 overview page (`R2_ACCOUNT_ID`).
+7. Paste all 5 variables into your Cloudflare Pages / Vercel Environment Variables.
+
+---
+
+## Step 5: Connect Your Custom Domain
 
 1. Go to **Workers & Pages** → **Your Project** → **Custom Domains**
 2. Click **Set up a custom domain**

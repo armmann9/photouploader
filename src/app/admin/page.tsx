@@ -16,7 +16,7 @@ import {
   ChevronRight, ShieldCheck, Download, Search,
   Printer, Bell, Menu, ArrowUpRight, Camera, QrCode, Sparkles, MapPin, RefreshCw,
   Sliders, Settings, SunDim, Palette, Lightbulb, Save, CheckCircle2, Globe, Database, Radio, Flame,
-  UserCheck, Phone, ToggleLeft, ToggleRight, Share2, Link2, Copy
+  UserCheck, Phone, ToggleLeft, ToggleRight, Share2, Link2, Copy, Zap
 } from 'lucide-react';
 import QRCodeModal from '@/components/QRCodeModal';
 import {
@@ -1250,6 +1250,10 @@ function FestivalSettingsSection({ showToast }: { showToast: (m: string) => void
   const [supabaseKey, setSupabaseKey] = useState('');
   const [cloudStatus, setCloudStatus] = useState<'configured' | 'offline'>('offline');
 
+  // Cloudflare R2 Object Storage state
+  const [r2Info, setR2Info] = useState<{ configured: boolean; bucketName?: string; publicUrl?: string; accountIdMasked?: string }>({ configured: false });
+  const [testingR2, setTestingR2] = useState(false);
+
   // Load initial settings
   useEffect(() => {
     try {
@@ -1282,10 +1286,35 @@ function FestivalSettingsSection({ showToast }: { showToast: (m: string) => void
       if (customUrl && customUrl.startsWith('http')) {
         setCloudStatus('configured');
       }
+
+      // Check R2 server config
+      fetch('/api/upload/r2')
+        .then((r) => r.json())
+        .then((data) => setR2Info(data))
+        .catch(() => {});
     } catch {
       // ignore
     }
   }, []);
+
+  const handleTestR2 = async () => {
+    setTestingR2(true);
+    try {
+      const res = await fetch('/api/upload/r2');
+      const data = await res.json();
+      setR2Info(data);
+      if (data.configured) {
+        showToast('⚡ Cloudflare R2 is active & configured!');
+        playTempleBell(880);
+      } else {
+        showToast('ℹ️ Cloudflare R2 variables not detected in current environment.');
+      }
+    } catch {
+      showToast('⚠️ Could not connect to Cloudflare R2 endpoint.');
+    } finally {
+      setTestingR2(false);
+    }
+  };
 
   const handleSaveThemeSettings = () => {
     try {
@@ -1574,7 +1603,71 @@ function FestivalSettingsSection({ showToast }: { showToast: (m: string) => void
         </div>
       </div>
 
-      {/* ── 3. SUPABASE CLOUD SYNC & STORAGE ── */}
+      {/* ── 3. CLOUDFLARE R2 OBJECT STORAGE (RECOMMENDED) ── */}
+      <div className="p-6 md:p-8 rounded-3xl bg-emerald-950/60 border border-emerald-700/50 shadow-sm backdrop-blur-sm space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-emerald-800/60">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
+              <Zap className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-display font-bold text-amber-100">Cloudflare R2 Object Storage</h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/30">
+                  Primary CDN Storage
+                </span>
+              </div>
+              <p className="text-xs text-emerald-300/70">Zero egress fees & global edge CDN for festival photo albums.</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
+              r2Info.configured
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                : 'bg-amber-500/15 text-amber-300 border border-amber-400/20'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${r2Info.configured ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              {r2Info.configured ? 'R2 Active & Connected' : 'Not Configured (Using Fallback)'}
+            </span>
+            <button
+              onClick={handleTestR2}
+              disabled={testingR2}
+              className="px-3.5 py-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 border border-emerald-600 text-amber-200 text-xs font-bold transition-all"
+            >
+              {testingR2 ? 'Testing...' : 'Test Connection'}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-emerald-900/40 p-3.5 rounded-2xl border border-emerald-800/60">
+            <div className="text-[11px] text-emerald-300/70 uppercase font-semibold">Bucket Name</div>
+            <div className="text-sm font-mono text-amber-200 mt-1 truncate">
+              {r2Info.bucketName || 'Not Set (e.g. bpscvs-photos)'}
+            </div>
+          </div>
+          <div className="bg-emerald-900/40 p-3.5 rounded-2xl border border-emerald-800/60">
+            <div className="text-[11px] text-emerald-300/70 uppercase font-semibold">Public CDN URL</div>
+            <div className="text-sm font-mono text-amber-200 mt-1 truncate">
+              {r2Info.publicUrl || 'Not Set (e.g. https://pub-xxx.r2.dev)'}
+            </div>
+          </div>
+          <div className="bg-emerald-900/40 p-3.5 rounded-2xl border border-emerald-800/60">
+            <div className="text-[11px] text-emerald-300/70 uppercase font-semibold">Cloudflare Account</div>
+            <div className="text-sm font-mono text-amber-200 mt-1 truncate">
+              {r2Info.accountIdMasked || 'Not Set'}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-emerald-950/80 p-4 rounded-2xl border border-emerald-800/40 text-xs text-emerald-200/80 leading-relaxed">
+          <span className="font-bold text-amber-300">How to configure Cloudflare R2: </span>
+          Set <code className="bg-emerald-900 px-1.5 py-0.5 rounded text-amber-200 font-mono">R2_ACCOUNT_ID</code>, <code className="bg-emerald-900 px-1.5 py-0.5 rounded text-amber-200 font-mono">R2_ACCESS_KEY_ID</code>, <code className="bg-emerald-900 px-1.5 py-0.5 rounded text-amber-200 font-mono">R2_SECRET_ACCESS_KEY</code>, <code className="bg-emerald-900 px-1.5 py-0.5 rounded text-amber-200 font-mono">R2_BUCKET_NAME</code>, and <code className="bg-emerald-900 px-1.5 py-0.5 rounded text-amber-200 font-mono">R2_PUBLIC_URL</code> in your Cloudflare Pages / Vercel Environment Variables.
+        </div>
+      </div>
+
+      {/* ── 4. SUPABASE CLOUD SYNC & STORAGE ── */}
       <div className="p-6 md:p-8 rounded-3xl bg-emerald-950/60 border border-emerald-700/50 shadow-sm backdrop-blur-sm space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-emerald-800/60">
           <div className="flex items-center gap-2">
