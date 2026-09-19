@@ -194,33 +194,34 @@ function AdminPanelContent() {
       {/* ── Main Content ────────────────────────────────────────── */}
       <div className="flex-1 md:ml-64 flex flex-col min-h-screen overflow-x-hidden">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex items-center justify-between px-6 py-4 bg-emerald-950/90 border-b border-emerald-700/40 backdrop-blur-md shadow-lg">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-30 flex items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4 bg-emerald-950/95 border-b border-amber-400/25 backdrop-blur-md shadow-lg">
+          <div className="flex items-center gap-2.5 sm:gap-3">
             <button
-              className="md:hidden text-amber-300 hover:text-amber-100 p-1"
+              className="md:hidden text-amber-300 hover:text-amber-100 p-1.5 rounded-lg bg-emerald-900/60 border border-emerald-700/50"
               onClick={() => setSidebarOpen(true)}
+              aria-label="Open Sidebar"
             >
               <Menu className="w-5 h-5" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-amber-200 font-display">
+              <h1 className="text-base sm:text-lg font-bold text-amber-200 font-display leading-tight">
                 {NAV_ITEMS.find(n => n.id === activeSection)?.label}
               </h1>
-              <p className="text-xs text-emerald-300/70">
+              <p className="text-[11px] sm:text-xs text-emerald-300/80">
                 {NAV_ITEMS.find(n => n.id === activeSection)?.labelHindi}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/30 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              Admin Panel Active
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/30 text-[11px] sm:text-xs font-semibold shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
+              <span>Admin Panel</span>
             </span>
           </div>
         </header>
 
         {/* Section Content */}
-        <main className="flex-1 p-6 md:p-8">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 max-w-full">
           {activeSection === 'events' && (
             <EventManagementSection showToast={showToast} />
           )}
