@@ -1,8 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 // Environment variables (provided when deployed to Vercel or locally via .env.local)
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL =
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://jwyafndvtwwtgervnzrm.supabase.co';
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp3eWFmbmR2dHd3dGdlcnZuenJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4Mjg0ODEsImV4cCI6MjEwNTQwNDQ4MX0.Co6MuVwk2D1qbMbbtusx0zCSlyWTRaH2WtNnkDsoH2g';
 
 let supabaseInstance: SupabaseClient | null = null;
 
